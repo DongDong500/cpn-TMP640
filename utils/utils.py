@@ -27,6 +27,6 @@ def save_argparser(parser, save_dir) -> dict:
     for key, val in vars(parser).items():
         jsummary[key] = val
 
-    save_dict_to_json(jsummary, os.path.join(save_dir, 'summary.json'))
+    save_dict_to_json(jsummary, os.path.join(save_dir, 'param-summary.json'))
 
     return jsummary
