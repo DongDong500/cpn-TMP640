@@ -1,6 +1,7 @@
 import segmentation_models_pytorch as SMP
 from vit_pytorch import ViT
 
+
 def deeplabv3plus_resnet50(encoder_name, encoder_depth, encoder_weights, encoder_output_stride, 
                             decoder_channels, decoder_atrous_rates, in_channels, classes, 
                             activation, upsampling, aux_params, **kwargs):
@@ -50,8 +51,8 @@ def vit(**kwargs):
 
     return ViT(**kwargs)
 
-def load_model(arg, verbose=True):
-    
-    model = ...
-    
-    return model 
+def unet(**kwargs):
+    """ U-Net: Convolutional Networks for Biomedical Image Segmentation.
+    """
+    from .unet import Unet
+    return Unet(n_channels=3, n_classes=2, )

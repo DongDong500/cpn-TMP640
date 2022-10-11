@@ -13,48 +13,67 @@ os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
 def mkLogDir(args, verbose=False):
 
     hostname = socket.gethostname()
-    rdir = os.path.dirname( os.path.dirname( os.path.abspath(__file__) ) )
-    s_folder = os.path.dirname( os.path.abspath(__file__) ).split('/')[-1] + '-result'
+    pth_prefix = os.path.dirname( os.path.dirname( os.path.abspath(__file__) ) )
+    folder_name = os.path.dirname( os.path.abspath(__file__) ).split('/')[-1] + '-result'
     current_time = datetime.now().strftime('%b%d_%H-%M-%S') + ('_demo' if args.run_demo else '')
 
     if verbose:
-        print(f'hostname: {hostname}\nfolder: {s_folder}\ncurrent time: {current_time}\ndir prefix: {rdir}')
+        print(f'hostname: {hostname}\nfolder: {folder_name}\ncurrent time: {current_time}\nprefix: {pth_prefix}')
     
     args.current_time = current_time
-    args.dir_prefix = os.path.join(rdir, s_folder, current_time)
-    args.tensorboard_dir = os.path.join(rdir, s_folder, current_time, 'tensorboard')
-    args.best_param_dir = os.path.join(rdir, s_folder, current_time, 'best-param')
+    args.prefix = os.path.join(pth_prefix, folder_name, current_time)
+    args.TB_dir = os.path.join(pth_prefix, folder_name, current_time, 'tensorboard')
+    args.BP_dir = os.path.join(pth_prefix, folder_name, current_time, 'best-param')
 
-    if not os.path.exists(args.dir_prefix):
-        os.makedirs(args.dir_prefix)
-        os.makedirs(os.path.join(args.dir_prefix, 'best-param'))
-        os.makedirs(os.path.join(args.dir_prefix, 'tensorboard'))
-
+    if not os.path.exists(args.prefix):
+        os.makedirs(args.prefix)
+        os.makedirs(os.path.join(args.prefix, 'best-param'))
+        os.makedirs(os.path.join(args.prefix, 'tensorboard'))
 
 def main_worker(args, ) -> dict:
  
-    params = utils.save_argparser(args, args.dir_prefix)
+    params = utils.save_argparser(args, args.prefix)
   
     results = {}
     for train_itrs in range(0, args.train_itrs):
         RUN_ID = 'run_' + str(train_itrs).zfill(2)
         print(f"{train_itrs + 1}-th iteration")
         
+        start_time = datetime.now()
         results[RUN_ID] = {}
+        msg_body = {
+            "Short Memo" : str(args.data_fold) + "-fold average summary",
+            "F1 score" : {
+                "background" : 0,
+                "RoI" : 0
+            },
+            "Bbox regression" : {
+                "MSE" : 0,
+            },
+            "time elapsed" : ""
+        }
+        f1bg = 0.0
+        f1roi = 0.0
+        bbox = 0.0
         for data_fold in range(0, args.data_fold):
             args.kfold = data_fold
             DATA_FOLD = 'fold_' + str(data_fold).zfill(2)
             print(f"{data_fold + 1}-th data fold")
+            os.makedirs(os.path.join( args.TB_dir, RUN_ID, DATA_FOLD ))
+            os.makedirs(os.path.join( args.BP_dir, RUN_ID, DATA_FOLD ))
+            results[RUN_ID][DATA_FOLD] = run_training(args, )
+            f1bg += results[RUN_ID][DATA_FOLD]['F1 score']['background']
+            f1roi += results[RUN_ID][DATA_FOLD]['F1 score']['RoI']
+            bbox += results[RUN_ID][DATA_FOLD]['Bbox regression']['MSE']
 
-            os.makedirs(os.path.join( args.tensorboard_dir, RUN_ID, DATA_FOLD ))
-            os.makedirs(os.path.join( args.best_param_dir, RUN_ID, DATA_FOLD ))
+        msg_body['F1 score']['background'] = f1bg / args.data_fold
+        msg_body['F1 score']['RoI'] = f1roi / args.data_fold
+        msg_body['Bbox regression']['MSE'] = bbox / args.data_fold
+        msg_body['time elapsed'] = str(datetime.now() - start_time)
 
-            results[RUN_ID][DATA_FOLD] = run_training(args)
-            
-            utils.Email()
+        utils.Email(msg=msg_body, ).send()
 
     return results
-
 
 def main():
     total_time = datetime.now()
@@ -66,8 +85,8 @@ def main():
         
         mkLogDir(args, verbose=True, )
 
-        result = main_worker(args, )
-        utils.save_dict_to_json(d= ,json_path=)
+        results = main_worker(args, )
+        utils.save_dict_to_json(d=results ,json_path=os.path.join(args.prefix, 'result-summary.json'))
 
     except KeyboardInterrupt:
         is_error = True
@@ -79,7 +98,7 @@ def main():
         print(traceback.format_exc())
     
     if is_error:
-        os.rename(args.log_dir_fdr, args.log_dir_fdr + '_aborted')
+        os.rename(args.prefix, args.prefix + '_aborted')
 
     total_time = datetime.now() - total_time
     print('Time elapsed (h:m:s.ms) {}'.format(total_time))

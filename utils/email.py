@@ -12,8 +12,8 @@ class Email(object):
                 subject: str = "Testing Mail system ... Do Not reply",
                 msg: dict = {}, 
                 attach: list = [],
-                login_dir: str = None,
-                ID = None, 
+                login_dir: str = '/home/dongik/src/login.json',
+                ID = 'singkuserver', 
                 ):
         """
         Args:
@@ -35,7 +35,7 @@ class Email(object):
                 self.users = json.load(f)
                 self.PW = self.users[self.ID]
         else:
-            raise RuntimeError("login file not found: ", self.login_dir)
+            raise RuntimeError("login info not exists:", self.login_dir)
 
     def send(self):
         """
