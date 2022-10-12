@@ -35,14 +35,14 @@ def main_worker(args, ) -> dict:
     params = utils.save_argparser(args, args.prefix)
   
     results = {}
-    for train_itrs in range(0, args.train_itrs):
-        RUN_ID = 'run_' + str(train_itrs).zfill(2)
-        print(f"{train_itrs + 1}-th iteration")
+    for exp_itrs in range(0, args.exp_itrs):
+        RUN_ID = 'run_' + str(exp_itrs).zfill(2)
+        print(f"{exp_itrs + 1}-th iteration")
         
         start_time = datetime.now()
         results[RUN_ID] = {}
         msg_body = {
-            "Short Memo" : str(args.data_fold) + "-fold average summary",
+            "Short Memo" : str(args.kfold) + "-fold average summary",
             "F1 score" : {
                 "background" : 0,
                 "RoI" : 0
@@ -55,20 +55,20 @@ def main_worker(args, ) -> dict:
         f1bg = 0.0
         f1roi = 0.0
         bbox = 0.0
-        for data_fold in range(0, args.data_fold):
-            args.kfold = data_fold
-            DATA_FOLD = 'fold_' + str(data_fold).zfill(2)
-            print(f"{data_fold + 1}-th data fold")
+        for i in range(0, args.kfold):
+            args.k = i
+            DATA_FOLD = 'fold_' + str(i).zfill(2)
+            print(f"{i + 1}-th data fold")
             os.makedirs(os.path.join( args.TB_dir, RUN_ID, DATA_FOLD ))
             os.makedirs(os.path.join( args.BP_dir, RUN_ID, DATA_FOLD ))
-            results[RUN_ID][DATA_FOLD] = run_training(args, )
+            results[RUN_ID][DATA_FOLD] = run_training(args, RUN_ID, DATA_FOLD)
             f1bg += results[RUN_ID][DATA_FOLD]['F1 score']['background']
             f1roi += results[RUN_ID][DATA_FOLD]['F1 score']['RoI']
             bbox += results[RUN_ID][DATA_FOLD]['Bbox regression']['MSE']
 
-        msg_body['F1 score']['background'] = f1bg / args.data_fold
-        msg_body['F1 score']['RoI'] = f1roi / args.data_fold
-        msg_body['Bbox regression']['MSE'] = bbox / args.data_fold
+        msg_body['F1 score']['background'] = f1bg / args.kfold
+        msg_body['F1 score']['RoI'] = f1roi / args.kfold
+        msg_body['Bbox regression']['MSE'] = bbox / args.kfold
         msg_body['time elapsed'] = str(datetime.now() - start_time)
 
         utils.Email(msg=msg_body, ).send()

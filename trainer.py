@@ -1,3 +1,4 @@
+import os
 import random
 
 import numpy as np
@@ -10,29 +11,39 @@ from datetime import datetime
 import models
 import utils
 
-def set_optim(args, model_name, model):
+def set_optim(args, model):
+
     ### Optimizer
-    if model_name.startswith("deeplab"):
+    if args.model.startswith("deeplab"):
         if args.optim == "SGD":
             optimizer = torch.optim.SGD(params=[
             {'params': model.encoder.parameters(), 'lr': 0.1 * args.lr},
             {'params': model.decoder.parameters(), 'lr': args.lr},
-            ], lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
+            ], lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay )
         elif args.optim == "RMSprop":
             optimizer = torch.optim.RMSprop(params=[
             {'params': model.backbone.parameters(), 'lr': 0.1 * args.lr},
             {'params': model.classifier.parameters(), 'lr': args.lr},
-            ], lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
+            ], lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay )
         elif args.optim == "Adam":
             optimizer = torch.optim.Adam(params=[
             {'params': model.backbone.parameters(), 'lr': 0.1 * args.lr},
             {'params': model.classifier.parameters(), 'lr': args.lr},
-            ], lr=args.lr, betas=(0.9, 0.999), eps=1e-8)
+            ], lr=args.lr, betas=(0.9, 0.999), eps=1e-8 )
         else:
             raise NotImplementedError
     else:
-        optimizer = torch.optim.SGD(
-            model.parameters(), lr=5e-4, weight_decay=5e-4, momentum=0.9)
+        if args.optim == "SGD":
+            optimizer = torch.optim.SGD(
+                model.parameters(), lr=args.lr, weight_decay=args.weight_decay, momentum=args.momentum )
+        elif args.optim == "RMSprop":
+            optimizer = torch.optim.RMSprop(
+                model.parameters(), lr=args.lr, weight_decay=args.weight_decay, momentum=args.momentum )
+        elif args.optim == "Adam":
+            optimizer = torch.optim.Adam(
+                model.parameters(), lr=args.lr, weight_decay=args.weight_decay, momentum=args.momentum )
+        else:
+            raise NotImplementedError
     
     ### Scheduler
     if args.lr_policy == 'lambdaLR':
@@ -43,7 +54,7 @@ def set_optim(args, model_name, model):
             optimizer=optimizer, )
     elif args.lr_policy == 'stepLR':
         scheduler = torch.optim.lr_scheduler.StepLR(
-            optimizer=optimizer, step_size=args.step_size)
+            optimizer=optimizer, step_size=args.step_size )
     elif args.lr_policy == 'multiStepLR':
         scheduler = torch.optim.lr_scheduler.MultiStepLR(
             optimizer=optimizer, )
@@ -61,13 +72,66 @@ def set_optim(args, model_name, model):
 
     return optimizer, scheduler
 
-def train_epoch():
-    ...
+def train_epoch(devices, model, loader, optimizer, scheduler, metrics, ):
 
-def val_epoch():
-    ...
+    model.train()
+    metrics.reset()
+    running_loss = 0.0
 
-def run_training(args, ) -> dict:
+    crietrion = ...
+
+    for i, (ims, lbls) in enumerate(loader):
+        optimizer.zero_grad()
+
+        ims = ims.to(devices)
+        lbls = lbls.to(devices)
+
+        outputs = model(ims)
+        probs = nn.Softmax(dim=1)(outputs)
+        preds = torch.max(probs, 1)[1].detach().cpu().numpy()
+        true = lbls.detach().cpu().numpy()
+        
+        loss = crietrion(outputs, lbls)
+        loss.backward()
+        optimizer.step()
+        metrics.update(true, preds)
+
+        running_loss += loss.item() * ims.size(0)
+    scheduler.step()
+    epoch_loss = running_loss / len(loader)
+    score = metrics.get_results()
+
+    return epoch_loss, score
+
+def val_epoch(devices, model, loader, metrics, ):
+
+    model.eval()
+    metrics.reset()
+    running_loss = 0.0
+
+    crietrion = ...
+
+    with torch.no_grad():
+        for i, (ims, lbls) in enumerate(loader):
+
+            ims = ims.to(devices)
+            lbls = lbls.to(devices)
+
+            outputs = model(ims)
+            probs = nn.Softmax(dim=1)(outputs)
+            preds = torch.max(probs, 1)[1].detach().cpu().numpy()
+            true = lbls.detach().cpu().numpy()
+            
+            loss = crietrion(outputs, lbls)
+            metrics.update(true, preds)
+
+            running_loss += loss.item() * ims.size(0)
+        epoch_loss = running_loss / len(loader)
+        score = metrics.get_results()
+
+    return epoch_loss, score
+
+def run_training(args, RUN_ID, DATA_FOLD) -> dict:
     start_time = datetime.now()
     results = {
         "Short Memo" : args.short_memo + " Kfold-" + str(args.kfold),
@@ -93,7 +157,7 @@ def run_training(args, ) -> dict:
     model = models.models.__dict__[args.model]()
 
     ### Set up optimizer and scheduler
-    optim, sched = set_optim(args, args.model, model)
+    optimizer, scheduler = set_optim(args, model)
 
     ### Resume models, schedulers and optimizer
     if args.resume:
@@ -105,14 +169,27 @@ def run_training(args, ) -> dict:
     if torch.cuda.device_count() > 1:
         print('cuda multiple GPUs')
         model = nn.DataParallel(model)
-
     model.to(devices)
 
     ### Set up metrics
-
+    metrics = utils.StreamSegMetrics(n_classes=2)
+    early_stop = utils.EarlyStopping(patience=args.patience, delta=args.delta, verbose=True, 
+                    path=os.path.join(args.BP_pth, RUN_ID, DATA_FOLD), ceiling=True, )
+    
     ### Train
+    for epoch in range(resume_epoch, args.total_itrs):
+        epoch_loss, score = train_epoch(devices, model, loader[0], optimizer, scheduler, metrics,)
 
+        epoch_loss, score = val_epoch(devices, model, loader[1], metrics, )
 
+        if early_stop.early_stop:
+            print("Early Stop !!!")
+            break
+
+        if args.run_demo and epoch > 2:
+            print("Run Demo !!!")
+            break
+    
     results['time elapsed'] = str(datetime.now() - start_time)
 
     return results

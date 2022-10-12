@@ -17,8 +17,12 @@ def get_argparser():
                         help="tensorboard log")
     parser.add_argument("--BP_pth", type=str, default='/', 
                         help="best param")
-    parser.add_argument("--data_pth", type=str, default='/home/dongik/datasets', 
+    parser.add_argument("--data_pth", type=str, default='/home/dongik/datasets',
                         help="")
+    parser.add_argument("--random_seed", type=int, default=1, 
+                        help="random seed (default: 1)")
+    parser.add_argument("--exp_itrs", type=int, default=1, 
+                        help='repeat n identical experiments (default: 1)')
     # Model options
     available_models = sorted(name for name in models.models.__dict__ if name.islower() and \
                               not (name.startswith("__") or name.startswith('_')) and callable(
@@ -27,27 +31,28 @@ def get_argparser():
                         help='model name (default: deeplabv3plus_resnet50)')
     
     # Dataset options
-    parser.add_argument("--modality", type=str, default="", 
-                        help='(default: )')
-    parser.add_argument("--region", type=str, default="", 
-                        help='(default: )')
-    parser.add_argument("--data_fold", type=int, default=5, 
-                        help="k-fold of data (default: 5)")
-    parser.add_argument("--kfold", type=int, default=0, 
-                        help="i-th fold of k-fold data (default: 0)")
-    # Train options
-    parser.add_argument("--random_seed", type=int, default=1, 
-                        help="random seed (default: 1)")
     parser.add_argument("--num_workers", type=int, default=8, 
                         help="number of workers (default: 8)")
-    parser.add_argument("--train_itrs", type=int, default=1, 
-                        help='repeat n identical experiments (default: 1)')
+    parser.add_argument("--modality", type=str, default="UN", 
+                        help='UN (unknown), HM (HM70A) or SN (miniSONO) (default: UN)')
+    parser.add_argument("--region", type=str, default="peroneal", 
+                        help='peroneal, median-forearm or median-wrist (default: peroneal)')
+    parser.add_argument("--kfold", type=int, default=5, 
+                        help="kfold (default: 5)")
+    parser.add_argument("--k", type=int, default=0, 
+                        help="i-th fold set of kfold data (default: 0)")
     parser.add_argument("--train_batch_size", type=int, default=32, 
                         help='train batch size (default: 32)')
     parser.add_argument("--val_batch_size", type=int, default=16, 
                         help='validate batch size (default: 16)') 
     parser.add_argument("--test_batch_size", type=int, default=16, 
                         help='test batch size (default: 16)')
+
+    # Train options
+    parser.add_argument("--total_itrs", type=int, default=1600,
+                        help="epoch number (default: 1.6k)")
+    parser.add_argument("--loss_type", type=str, default='entropydice',
+                        help="criterion (default: ce+dl)")
     parser.add_argument("--optim", type=str, default='SGD',
                         help="optimizer (default: SGD)")
     parser.add_argument("--weight_decay", type=float, default=5e-4,
@@ -60,8 +65,7 @@ def get_argparser():
                         help="scheduler")
     parser.add_argument("--step_size", type=int, default=100, 
                         help="step size (default: 100)")
-    parser.add_argument("--loss_type", type=str, default='entropydice',
-                        help="criterion (default: ce+dl)")
+    
     # Early-stop options
     parser.add_argument("--patience", type=int, default=100,
                         help="Number of epochs with no improvement after which training will be stopped (default: 100)")

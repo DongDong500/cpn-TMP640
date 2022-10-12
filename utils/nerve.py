@@ -1,17 +1,17 @@
 import os
-import sys
 import torch.utils.data as data
 from PIL import Image
 
-class Peroneal(data.Dataset):
+class Nerve(data.Dataset):
     """
-    Args:6
-        root (string): Root directory of the VOC Dataset.
-        datatype (string): Dataset type 
-        image_set (string): Select the image_set to use, ``train``, ``val`` or ``test``
+    Args:
+        root_pth (string): Root directory path of the ultrasound peripheral nerve dataset.
+        datatype (string): Dataset type. ``peroneal, median-forearm or median-wrist``
+        modality (string): Ultrasound modality. ``UN (unknown), HM (HM70A) or SN (miniSONO)``
+        fold     (string): Data fold, kfold with i-th set. E.g. ``v5/3``
+        image_set (string): Select the image_set to use. ``train or val``
         transform (callable, optional): A function/transform that  takes in an PIL image
-            and returns a transformed version. E.g, ``transforms.RandomCrop``
-        dver (str): version of dataset (ex) ``splits``
+                                        and returns a transformed version. E.g, ``transforms.RandomCrop``
     """
     def _read(self, index):
         """
@@ -25,34 +25,30 @@ class Peroneal(data.Dataset):
         if not os.path.exists(self.masks[index]):
             raise FileNotFoundError
         
-        if self.is_rgb:
-            img = Image.open(self.images[index]).convert('RGB')
-            target = Image.open(self.masks[index]).convert('L')         
-        else:
-            img = Image.open(self.images[index]).convert('L')
-            target = Image.open(self.masks[index]).convert('L')            
+        img = Image.open(self.images[index]).convert('RGB')
+        target = Image.open(self.masks[index]).convert('L')                  
 
-        assert( img.size == target.size == (512, 512) )
+        assert( img.size == target.size == (640, 640) )
 
         return img, target
 
-    def __init__(self, root, datatype='peroneal', dver='splits', 
-                    image_set='train', transform=None, is_rgb=True):
+    def __init__(self, root_pth, datatype='peroneal', modality='UN', fold='v5/3',
+                    image_set='train', transform=None, ):
 
-        self.root = root
+        self.root_pth = root_pth
         self.datatype = datatype
-        self.dver = dver
+        self.modality = modality
+        self.fold = fold
         self.image_set = image_set
         self.transform = transform
-        self.is_rgb = is_rgb
 
-        image_dir = os.path.join(self.root, self.datatype, 'Images')
-        mask_dir = os.path.join(self.root, self.datatype, 'Masks')
-        split_f = os.path.join(self.root, self.datatype, self.dver, self.image_set.rstrip('\n') + '.txt')
+        image_dir = os.path.join(self.root_pth, self.datatype, self.modality, 'Images')
+        mask_dir = os.path.join(self.root_pth, self.datatype, self.modality, 'Masks')
+        split_f = os.path.join(self.root_pth, self.datatype, self.modality, 'splits',
+                                self.fold, self.image_set.rstrip('\n') + '.txt')
 
         if not os.path.exists(image_dir) or not os.path.exists(mask_dir):
             raise Exception('Dataset not found or corrupted.')
-        
         if not os.path.exists(split_f):
             raise Exception('Wrong image_set entered!' 
                             'Please use image_set="train" or image_set="val"', split_f)
@@ -60,8 +56,9 @@ class Peroneal(data.Dataset):
         with open(os.path.join(split_f), "r") as f:
             file_names = [x.strip() for x in f.readlines()]
 
-        self.images = [os.path.join(image_dir, x + ".jpg") for x in file_names]
-        self.masks = [os.path.join(mask_dir, x + ".jpg") for x in file_names]
+        fileF = os.listdir(image_dir)[-1].split('.')[-1]
+        self.images = [os.path.join(image_dir, x + f".{fileF}") for x in file_names]
+        self.masks = [os.path.join(mask_dir, x + f".{fileF}") for x in file_names]
         
         assert (len(self.images) == len(self.masks))
 
@@ -92,30 +89,25 @@ class Peroneal(data.Dataset):
 
 
 if __name__ == "__main__":
-
+    import sys
     print(os.path.dirname( os.path.dirname( os.path.abspath(__file__) ) ))
     sys.path.append(os.path.dirname( os.path.dirname( os.path.abspath(__file__) ) ))
-    from utils import ext_transforms as et
+    
     from torch.utils.data import DataLoader
     from tqdm import tqdm
-
-    transform = et.ExtCompose([
-            et.ExtRandomCrop(size=(512, 512), is_crop=True, pad_if_needed=True),
-            et.ExtScale(scale=0.5, is_scale=True),
-            et.ExtToTensor(),
-            et.ExtNormalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-            ])
+    import ext_transforms as et
     
-    image_set_type = ['train', 'val', 'test']
+    transform = et.ExtCompose([
+            et.ExtToTensor(),
+            et.ExtNormalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) ])
+    image_set_type = ['train', 'val']
     for ist in image_set_type:
-        dst = Peroneal(root='/home/dongik/datasets', datatype='Peroneal', image_set=ist,
-                    transform=transform, is_rgb=True, dver='splits')
-        loader = DataLoader(dst, batch_size=16,
-                                shuffle=True, num_workers=2, drop_last=True)
+        dst = Nerve(root_pth='/home/dongik/datasets', datatype='peroneal', 
+                        modality='UN', fold='v5/3', image_set=ist, transform=transform, )
+        loader = DataLoader(dst, batch_size=16, shuffle=True, num_workers=2, drop_last=True)
         print(f'len [{ist}]: {len(dst)}')
 
         for i, (ims, lbls) in tqdm(enumerate(loader)):
             pass
-        
         print('Clear !!!')
     

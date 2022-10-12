@@ -47,11 +47,11 @@ def deeplabv3plus_resnet101(encoder_name, encoder_depth, encoder_weights, encode
                                 decoder_channels=decoder_channels, decoder_atrous_rates=decoder_atrous_rates, in_channels=in_channels, classes=classes, 
                                 activation=activation, upsampling=upsampling, aux_params=aux_params)
 
-def vit(**kwargs):
+def vit(**kwargs, ):
 
     return ViT(**kwargs)
 
-def unet(**kwargs):
+def unet(**kwargs, ):
     """ U-Net: Convolutional Networks for Biomedical Image Segmentation.
     """
     from .unet import Unet
