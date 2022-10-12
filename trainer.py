@@ -5,11 +5,18 @@ import numpy as np
 
 import torch
 import torch.nn as nn
-
+from tqdm import tqdm
 from datetime import datetime
 
+import criterion
 import models
 import utils
+
+def print_result(phase, score, epoch, total_itrs, loss):
+    print("[{}] Epoch: {}/{} Loss: {:.5f}".format(phase, epoch, total_itrs, loss))
+    print("\tF1 [0]: {:.5f} [1]: {:.5f}".format(score['Class F1'][0], score['Class F1'][1]))
+    print("\tIoU[0]: {:.5f} [1]: {:.5f}".format(score['Class IoU'][0], score['Class IoU'][1]))
+    print("\tOverall Acc: {:.3f}, Mean Acc: {:.3f}".format(score['Overall Acc'], score['Mean Acc']))
 
 def set_optim(args, model):
 
@@ -72,15 +79,15 @@ def set_optim(args, model):
 
     return optimizer, scheduler
 
-def train_epoch(devices, model, loader, optimizer, scheduler, metrics, ):
+def train_epoch(devices, model, loader, optimizer, scheduler, metrics, args):
 
     model.train()
     metrics.reset()
     running_loss = 0.0
 
-    crietrion = ...
+    crietrion = criterion.get_criterion.__dict__[args.loss_type]()
 
-    for i, (ims, lbls) in enumerate(loader):
+    for i, (ims, lbls) in tqdm(enumerate(loader)):
         optimizer.zero_grad()
 
         ims = ims.to(devices)
@@ -103,13 +110,13 @@ def train_epoch(devices, model, loader, optimizer, scheduler, metrics, ):
 
     return epoch_loss, score
 
-def val_epoch(devices, model, loader, metrics, ):
+def val_epoch(devices, model, loader, metrics, args):
 
     model.eval()
     metrics.reset()
     running_loss = 0.0
 
-    crietrion = ...
+    crietrion = criterion.get_criterion.__dict__[args.loss_type]()
 
     with torch.no_grad():
         for i, (ims, lbls) in enumerate(loader):
@@ -175,21 +182,28 @@ def run_training(args, RUN_ID, DATA_FOLD) -> dict:
     metrics = utils.StreamSegMetrics(n_classes=2)
     early_stop = utils.EarlyStopping(patience=args.patience, delta=args.delta, verbose=True, 
                     path=os.path.join(args.BP_pth, RUN_ID, DATA_FOLD), ceiling=True, )
-    
+
     ### Train
     for epoch in range(resume_epoch, args.total_itrs):
-        epoch_loss, score = train_epoch(devices, model, loader[0], optimizer, scheduler, metrics,)
+        epoch_loss, score = train_epoch(devices, model, loader[0], optimizer, scheduler, metrics, args)
+        print_result('train', score, epoch, args.total_itrs, epoch_loss)
+        epoch_loss, score = val_epoch(devices, model, loader[1], metrics, args)
+        print_result('val', score, epoch, args.total_itrs, epoch_loss)
 
-        epoch_loss, score = val_epoch(devices, model, loader[1], metrics, )
+        if early_stop(score['Class F1'][1], model, optimizer, scheduler, epoch):
+            best_score = score
+            best_loss = epoch_loss
 
         if early_stop.early_stop:
             print("Early Stop !!!")
             break
 
-        if args.run_demo and epoch > 2:
+        if args.run_demo and epoch >= 2:
             print("Run Demo !!!")
             break
     
+    results['F1 score']['background'] = best_score['Class F1'][0]
+    results['F1 score']['RoI'] = best_score['Class F1'][1]
     results['time elapsed'] = str(datetime.now() - start_time)
 
     return results

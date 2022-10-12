@@ -29,7 +29,30 @@ def get_argparser():
                               models.models.__dict__[name]) )
     parser.add_argument("--model", type=str, default='deeplabv3plus_resnet50', choices=available_models,
                         help='model name (default: deeplabv3plus_resnet50)')
-    
+    # DeeplabV3+ options
+    parser.add_argument("--encoder_name", type=str, default='resnet50',
+                        help='Name of the classification model that will be used as an encoder (a.k.a backbone)')
+    parser.add_argument("--encoder_depth", type=int, default=5,
+                        help='A number of stages used in encoder in range [3, 5]')
+    parser.add_argument("--encoder_weights", type=str, default='imagenet',
+                        help=' One of None (random initialization), “imagenet” (pre-training on ImageNet) and other pretrained weights')
+    parser.add_argument("--encoder_output_stride", type=int, default=16,
+                        help='Downsampling factor for last encoder features')
+    parser.add_argument("--decoder_atrous_rates", type=int, default=(12, 24, 36),
+                        help='Dilation rates for ASPP module')
+    parser.add_argument("--decoder_channels", type=tuple, default=256,
+                        help='A number of convolution filters in ASPP module')
+    parser.add_argument("--in_channels", type=int, default=3,
+                        help='A number of input channels for the model, default is 3 (RGB images)')
+    parser.add_argument("--classes", type=int, default=2,
+                        help='A number of classes for output mask')
+    parser.add_argument("--activation", type=str, default=None,
+                        help='An activation function to apply after the final convolution layer')
+    parser.add_argument("--upsampling", type=int, default=4,
+                        help='Final upsampling factor. Default is 4 to preserve input-output spatial shape identity')
+    parser.add_argument("--aux_params", type=dict, default=None,
+                        help='Dictionary with parameters of the auxiliary output (classification head)')
+                        
     # Dataset options
     parser.add_argument("--num_workers", type=int, default=8, 
                         help="number of workers (default: 8)")
@@ -41,10 +64,10 @@ def get_argparser():
                         help="kfold (default: 5)")
     parser.add_argument("--k", type=int, default=0, 
                         help="i-th fold set of kfold data (default: 0)")
-    parser.add_argument("--train_batch_size", type=int, default=32, 
-                        help='train batch size (default: 32)')
-    parser.add_argument("--val_batch_size", type=int, default=16, 
-                        help='validate batch size (default: 16)') 
+    parser.add_argument("--train_batch_size", type=int, default=8, 
+                        help='train batch size (default: 8)')
+    parser.add_argument("--val_batch_size", type=int, default=4, 
+                        help='validate batch size (default: 4)') 
     parser.add_argument("--test_batch_size", type=int, default=16, 
                         help='test batch size (default: 16)')
 

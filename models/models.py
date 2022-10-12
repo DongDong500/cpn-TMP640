@@ -2,9 +2,9 @@ import segmentation_models_pytorch as SMP
 from vit_pytorch import ViT
 
 
-def deeplabv3plus_resnet50(encoder_name, encoder_depth, encoder_weights, encoder_output_stride, 
-                            decoder_channels, decoder_atrous_rates, in_channels, classes, 
-                            activation, upsampling, aux_params, **kwargs):
+def deeplabv3plus_resnet50(encoder_name='resnet50', encoder_depth=5, encoder_weights='imagenet', encoder_output_stride=16, 
+                            decoder_channels=256, decoder_atrous_rates=(12, 24, 36), in_channels=3, classes=2, 
+                            activation=None, upsampling=4, aux_params=None, **kwargs):
     """Constructs a DeepLabV3+ model with a ResNet-50 backbone.
 
     Args:

@@ -22,8 +22,8 @@ def mkLogDir(args, verbose=False):
     
     args.current_time = current_time
     args.prefix = os.path.join(pth_prefix, folder_name, current_time)
-    args.TB_dir = os.path.join(pth_prefix, folder_name, current_time, 'tensorboard')
-    args.BP_dir = os.path.join(pth_prefix, folder_name, current_time, 'best-param')
+    args.TB_pth = os.path.join(pth_prefix, folder_name, current_time, 'tensorboard')
+    args.BP_pth = os.path.join(pth_prefix, folder_name, current_time, 'best-param')
 
     if not os.path.exists(args.prefix):
         os.makedirs(args.prefix)
@@ -59,8 +59,8 @@ def main_worker(args, ) -> dict:
             args.k = i
             DATA_FOLD = 'fold_' + str(i).zfill(2)
             print(f"{i + 1}-th data fold")
-            os.makedirs(os.path.join( args.TB_dir, RUN_ID, DATA_FOLD ))
-            os.makedirs(os.path.join( args.BP_dir, RUN_ID, DATA_FOLD ))
+            os.makedirs(os.path.join( args.TB_pth, RUN_ID, DATA_FOLD ))
+            os.makedirs(os.path.join( args.BP_pth, RUN_ID, DATA_FOLD ))
             results[RUN_ID][DATA_FOLD] = run_training(args, RUN_ID, DATA_FOLD)
             f1bg += results[RUN_ID][DATA_FOLD]['F1 score']['background']
             f1roi += results[RUN_ID][DATA_FOLD]['F1 score']['RoI']

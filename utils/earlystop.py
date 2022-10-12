@@ -31,9 +31,10 @@ class EarlyStopping:
         self.early_stop = False
 
     def __call__(self, score, model, optimizer, scheduler, cur_epoch):
+
         
         if self.ceiling:
-            if score > self.ceiling + self.delta:
+            if score > self.best_score + self.delta:
                 self.save_checkpoint(score, model, optimizer, scheduler, cur_epoch)
                 self.counter = 0
                 self.best_score = score
@@ -45,7 +46,7 @@ class EarlyStopping:
                     self.early_stop = True
                 return False
         else:
-            if score < self.ceiling - self.delta:
+            if score < self.best_score - self.delta:
                 self.save_checkpoint(score, model, optimizer, scheduler, cur_epoch)
                 self.counter = 0
                 self.best_score = score
