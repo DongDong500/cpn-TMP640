@@ -100,32 +100,39 @@ def train_epoch(devices, model, backbone, loader, optimizer, scheduler, metrics,
 
     model.train()
     metrics.reset()
-    running_loss = 0.0
+    running_loss = [0.0, 0.0]
 
     loss_func = criterion.get_criterion.__dict__[args.loss_type]()
-    
-    for i, (ims, lbls) in tqdm(enumerate(loader)):
+    mse = criterion.get_criterion.__dict__['mseloss']()
+
+    for i, (ims, lbls) in tqdm(enumerate(loader), total=len(loader)):
         optimizer[0].zero_grad()
         optimizer[1].zero_grad()
 
         ims = ims.to(devices)
         mas = lbls[0].to(devices)
+        bbox = lbls[1].to(devices)
+
+        outputs = backbone(ims)
+        mse_loss = mse(outputs, bbox)
+        mse_loss.backward()
 
         outputs = model(ims)
         probs = nn.Softmax(dim=1)(outputs)
         preds = torch.max(probs, 1)[1].detach().cpu().numpy()
         true = mas.detach().cpu().numpy()
-        
+
         loss = loss_func(outputs, mas)
         loss.backward()
         optimizer[0].step()
         optimizer[1].step()
         metrics.update(true, preds)
 
-        running_loss += loss.item() * ims.size(0)
+        running_loss[0] += loss.item() * ims.size(0)
+        running_loss[1] += mse_loss.item() * ims.size(0)
     scheduler[0].step()
     scheduler[1].step()
-    epoch_loss = running_loss / len(loader)
+    epoch_loss = [running_loss[0] / len(loader), running_loss[1] / len(loader)]
     score = metrics.get_results()
 
     return epoch_loss, score
@@ -134,15 +141,20 @@ def val_epoch(devices, model, backbone, loader, metrics, args):
 
     model.eval()
     metrics.reset()
-    running_loss = 0.0
+    running_loss = [0.0, 0.0]
 
     loss_func = criterion.get_criterion.__dict__[args.loss_type]()
+    mse = criterion.get_criterion.__dict__['mseloss']()
 
     with torch.no_grad():
-        for i, (ims, lbls) in enumerate(loader):
+        for i, (ims, lbls) in tqdm(enumerate(loader), total=len(loader)):
 
             ims = ims.to(devices)
             mas = lbls[0].to(devices)
+            bbox = lbls[1].to(devices)
+
+            outputs = backbone(ims)
+            mse_loss = mse(outputs, bbox)
 
             outputs = model(ims)
             probs = nn.Softmax(dim=1)(outputs)
@@ -152,8 +164,9 @@ def val_epoch(devices, model, backbone, loader, metrics, args):
             loss = loss_func(outputs, mas)
             metrics.update(true, preds)
 
-            running_loss += loss.item() * ims.size(0)
-        epoch_loss = running_loss / len(loader)
+            running_loss[0] += loss.item() * ims.size(0)
+            running_loss[1] += mse_loss.item() * ims.size(0)
+        epoch_loss = [running_loss[0] / len(loader), running_loss[1] / len(loader)]
         score = metrics.get_results()
 
     return epoch_loss, score
@@ -195,26 +208,33 @@ def run_training(args, RUN_ID, DATA_FOLD) -> dict:
     metrics = utils.StreamSegMetrics(n_classes=2)
     early_stop = utils.EarlyStopping(patience=args.patience, delta=args.delta, verbose=True, 
                     path=os.path.join(args.BP_pth, RUN_ID, DATA_FOLD), ceiling=True, )
-
+    backbone_stop = utils.EarlyStopping(patience=args.patience, delta=args.delta, verbose=True, 
+                        path=os.path.join(args.BP_pth, RUN_ID, DATA_FOLD), ceiling=False)
     ### Train
     for epoch in range(resume_epoch, args.total_itrs):
         epoch_loss, score = train_epoch(devices, model, backbone, loader[0], optimizer, scheduler, metrics, args)
-        print_result('train', score, epoch, args.total_itrs, epoch_loss)
-        add_writer_scalar(writer, 'train', score, epoch_loss, epoch)
-        
+        print_result('train', score, epoch, args.total_itrs, epoch_loss[0])
+        add_writer_scalar(writer, 'train', score, epoch_loss[0], epoch)
+        print(f"MSE Loss: {epoch_loss[1]:.5f}")
+        writer.add_scalar('MSE epoch loss/train', epoch_loss[1], epoch)
+
         epoch_loss, score = val_epoch(devices, model, backbone, loader[1], metrics, args)
-        print_result('val', score, epoch, args.total_itrs, epoch_loss)
-        add_writer_scalar(writer, 'val', score, epoch_loss, epoch)
+        print_result('val', score, epoch, args.total_itrs, epoch_loss[0])
+        add_writer_scalar(writer, 'val', score, epoch_loss[0], epoch)
+        print(f"MSE Loss: {epoch_loss[1]:.5f}")
+        writer.add_scalar('MSE epoch loss/val', epoch_loss[1], epoch)
 
         if early_stop(score['Class F1'][1], model, optimizer[0], scheduler[0], epoch):
             best_score = score
             best_loss = epoch_loss
+        if backbone_stop(epoch_loss[1], backbone, optimizer[1], scheduler[1], epoch):
+            pass
 
         if early_stop.early_stop:
             print("Early Stop !!!")
             break
 
-        if args.run_demo and epoch >= 2:
+        if args.run_demo and epoch >= 1:
             print("Run Demo !!!")
             break
     

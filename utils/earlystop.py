@@ -61,11 +61,17 @@ class EarlyStopping:
     def save_checkpoint(self, score, model, optimizer, scheduler, cur_epoch):
         '''save model parameters if validation loss has been improved'''
         if self.verbose:
-            print(f'Validation loss decreased ({self.best_score:.4f} --> {score:.4f})')
+            msg = 'Score increased' if self.ceiling else 'Validation loss decreased'
+            print(f'{msg} ({self.best_score:.4f} --> {score:.4f})')
+        
+        if not os.path.exists(os.path.join(self.path, 'checkpoint.pt')):
+            ckpt = 'backbone.pt'
+        else:
+            ckpt = 'checkpoint.pt'
         
         torch.save({
             'model_state' : model.state_dict(),
             'optimizer_state' : optimizer.state_dict(),
             'scheduler_state' : scheduler.state_dict(),
             'cur_epoch' : cur_epoch,
-        }, os.path.join(self.path, 'checkpoint.pt'))
+        }, os.path.join(self.path, ckpt))

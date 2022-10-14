@@ -9,3 +9,4 @@ if __name__ == "__main__":
     inputs = torch.rand(5, 3, 640, 640)
     print(summary(net, (3, 640, 640), device='cpu'))
     print(net(inputs).shape)
+    #print(net.parameters())

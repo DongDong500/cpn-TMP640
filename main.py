@@ -60,7 +60,7 @@ def main_worker(args, ) -> dict:
         msg_body = {
             "Description" : f"kfold (k={args.kfold}) average summary",
             "Short Memo" : args.short_memo,
-            "Model" : "Model :" + args.model,
+            "Model" : "Model: " + args.model,
             "Dir" : "Dir: " + args.current_time,
             "F1 score" : {
                 "background" : f"{f1bg / args.kfold:.5f}",

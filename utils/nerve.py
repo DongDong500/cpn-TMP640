@@ -21,7 +21,7 @@ class Nerve(data.Dataset):
         h, w = np.where(mask > 0)
         tl = (h.min(), w.min())
         rb = (h.max(), w.max())
-        pnt = np.array([ (tl[0] + rb[0]) / 1280 , (tl[1] + rb[1]) / 1280 ], dtype=np.float32)
+        pnt = np.array([ (tl[0] + rb[0] - 640) / 1280 , (tl[1] + rb[1] - 640) / 1280 ], dtype=np.float32)
 
         return pnt
 
