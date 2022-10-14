@@ -301,7 +301,7 @@ class ExtToTensor(object):
             tar[np.where(np.array(lbl) > 0)] = 1
             #lbl = (np.array( lbl, dtype=self.target_type) / 255) + 1.0 - 1/255
             #lbl = lbl.astype('long')
-            return F.to_tensor(pic), torch.from_numpy( tar )
+            return F.to_tensor(pic), torch.from_numpy(tar)
         if self.normalize:
             return F.to_tensor(pic), torch.from_numpy( np.array( lbl, dtype=self.target_type) )
         else:

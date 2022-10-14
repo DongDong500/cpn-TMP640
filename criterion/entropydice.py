@@ -42,17 +42,24 @@ class EntropyDiceLoss(_WeightedLoss):
 
     def __init__(self, weight: Optional[torch.Tensor] = None, size_average=None, ignore_index: int = -100,
                  reduce=None, reduction: str = 'mean', label_smoothing: float = 0.0 , 
-                 multiclass: bool = True, num_classes: int = 2) -> None:
+                 multiclass: bool = True, update_weight: bool = True, num_classes: int = 2) -> None:
         super(EntropyDiceLoss, self).__init__(weight, size_average, reduce, reduction)
         self.ignore_index = ignore_index
         self.label_smoothing = label_smoothing
         self.multiclass = multiclass
+        self.update_weight = update_weight
         self.num_classes = num_classes
     
-    def update_weight(self, weight: Optional[Tensor] = None):
-        self.weight = weight
+    def _update_weight(self, target, weight: Optional[Tensor] = None):
+        weights = target.sum() / (target.shape[0] * target.shape[1] * target.shape[2])
+        if weights < 0 or weights > 1:
+            raise Exception (f'weights: {weights} for cross entropy is wrong')
+        self.weight = torch.tensor([weights, 1 - weights], dtype=torch.float32)
 
     def forward(self, input: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+
+        if self.update_weight and self.num_classes == 2:
+            self._update_weight(target, )
 
         ce = F.cross_entropy(input, target, weight=self.weight,
                                ignore_index=self.ignore_index, reduction=self.reduction,

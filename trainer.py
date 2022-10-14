@@ -5,6 +5,7 @@ import numpy as np
 
 import torch
 import torch.nn as nn
+from tensorboardX import SummaryWriter
 from tqdm import tqdm
 from datetime import datetime
 
@@ -12,28 +13,38 @@ import criterion
 import models
 import utils
 
+
 def print_result(phase, score, epoch, total_itrs, loss):
     print("[{}] Epoch: {}/{} Loss: {:.5f}".format(phase, epoch, total_itrs, loss))
     print("\tF1 [0]: {:.5f} [1]: {:.5f}".format(score['Class F1'][0], score['Class F1'][1]))
     print("\tIoU[0]: {:.5f} [1]: {:.5f}".format(score['Class IoU'][0], score['Class IoU'][1]))
     print("\tOverall Acc: {:.3f}, Mean Acc: {:.3f}".format(score['Overall Acc'], score['Mean Acc']))
 
-def set_optim(args, model):
+def add_writer_scalar(writer, phase, score, loss, epoch):
+    writer.add_scalar(f'IoU BG/{phase}', score['Class IoU'][0], epoch)
+    writer.add_scalar(f'IoU Nerve/{phase}', score['Class IoU'][1], epoch)
+    writer.add_scalar(f'Dice BG/{phase}', score['Class F1'][0], epoch)
+    writer.add_scalar(f'Dice Nerve/{phase}', score['Class F1'][1], epoch)
+    writer.add_scalar(f'epoch loss/{phase}', loss, epoch)
 
-    ### Optimizer
+def set_optim(args, model, backbone):
+
+    optimizer = [None, None]
+    scheduler = [None, None]
+    ### Optimizer (Segmentation)
     if args.model.startswith("deeplab"):
         if args.optim == "SGD":
-            optimizer = torch.optim.SGD(params=[
+            optimizer[0] = torch.optim.SGD(params=[
             {'params': model.encoder.parameters(), 'lr': 0.1 * args.lr},
             {'params': model.decoder.parameters(), 'lr': args.lr},
             ], lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay )
         elif args.optim == "RMSprop":
-            optimizer = torch.optim.RMSprop(params=[
+            optimizer[0] = torch.optim.RMSprop(params=[
             {'params': model.backbone.parameters(), 'lr': 0.1 * args.lr},
             {'params': model.classifier.parameters(), 'lr': args.lr},
             ], lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay )
         elif args.optim == "Adam":
-            optimizer = torch.optim.Adam(params=[
+            optimizer[0] = torch.optim.Adam(params=[
             {'params': model.backbone.parameters(), 'lr': 0.1 * args.lr},
             {'params': model.classifier.parameters(), 'lr': args.lr},
             ], lr=args.lr, betas=(0.9, 0.999), eps=1e-8 )
@@ -41,95 +52,104 @@ def set_optim(args, model):
             raise NotImplementedError
     else:
         if args.optim == "SGD":
-            optimizer = torch.optim.SGD(
+            optimizer[0] = torch.optim.SGD(
                 model.parameters(), lr=args.lr, weight_decay=args.weight_decay, momentum=args.momentum )
         elif args.optim == "RMSprop":
-            optimizer = torch.optim.RMSprop(
+            optimizer[0] = torch.optim.RMSprop(
                 model.parameters(), lr=args.lr, weight_decay=args.weight_decay, momentum=args.momentum )
         elif args.optim == "Adam":
-            optimizer = torch.optim.Adam(
+            optimizer[0] = torch.optim.Adam(
                 model.parameters(), lr=args.lr, weight_decay=args.weight_decay, momentum=args.momentum )
         else:
             raise NotImplementedError
-    
-    ### Scheduler
+    ### Optimizer (Backbone)
+    optimizer[1] = torch.optim.SGD(
+                    backbone.parameters(), lr=args.lr, weight_decay=args.weight_decay, momentum=args.momentum )
+
+    ### Scheduler (Segmentation)
     if args.lr_policy == 'lambdaLR':
-        scheduler = torch.optim.lr_scheduler.LambdaLR(
-            optimizer=optimizer, )
+        scheduler[0] = torch.optim.lr_scheduler.LambdaLR(
+            optimizer=optimizer[0], )
     elif args.lr_policy == 'multiplicativeLR':
-        scheduler = torch.optim.lr_scheduler.MultiStepLR(
-            optimizer=optimizer, )
+        scheduler[0] = torch.optim.lr_scheduler.MultiStepLR(
+            optimizer=optimizer[0], )
     elif args.lr_policy == 'stepLR':
-        scheduler = torch.optim.lr_scheduler.StepLR(
-            optimizer=optimizer, step_size=args.step_size )
+        scheduler[0] = torch.optim.lr_scheduler.StepLR(
+            optimizer=optimizer[0], step_size=args.step_size )
     elif args.lr_policy == 'multiStepLR':
-        scheduler = torch.optim.lr_scheduler.MultiStepLR(
-            optimizer=optimizer, )
+        scheduler[0] = torch.optim.lr_scheduler.MultiStepLR(
+            optimizer=optimizer[0], )
     elif args.lr_policy == 'exponentialLR':
-        scheduler = torch.optim.lr_scheduler.ExponentialLR(
-            optimizer=optimizer, )
+        scheduler[0] = torch.optim.lr_scheduler.ExponentialLR(
+            optimizer=optimizer[0], )
     elif args.lr_policy == 'cosineAnnealingLR':
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer=optimizer, )
+        scheduler[0] = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer=optimizer[0], )
     elif args.lr_policy == 'cyclicLR':
-        scheduler = torch.optim.lr_scheduler.CyclicLR(
-            optimizer=optimizer, )
+        scheduler[0] = torch.optim.lr_scheduler.CyclicLR(
+            optimizer=optimizer[0], )
     else:
         raise NotImplementedError
+    ### Scheduler (backbone)
+    scheduler[1] = torch.optim.lr_scheduler.StepLR(
+                    optimizer=optimizer[1], step_size=args.step_size )
 
     return optimizer, scheduler
 
-def train_epoch(devices, model, loader, optimizer, scheduler, metrics, args):
+def train_epoch(devices, model, backbone, loader, optimizer, scheduler, metrics, args):
 
     model.train()
     metrics.reset()
     running_loss = 0.0
 
-    crietrion = criterion.get_criterion.__dict__[args.loss_type]()
-
+    loss_func = criterion.get_criterion.__dict__[args.loss_type]()
+    
     for i, (ims, lbls) in tqdm(enumerate(loader)):
-        optimizer.zero_grad()
+        optimizer[0].zero_grad()
+        optimizer[1].zero_grad()
 
         ims = ims.to(devices)
-        lbls = lbls.to(devices)
+        mas = lbls[0].to(devices)
 
         outputs = model(ims)
         probs = nn.Softmax(dim=1)(outputs)
         preds = torch.max(probs, 1)[1].detach().cpu().numpy()
-        true = lbls.detach().cpu().numpy()
+        true = mas.detach().cpu().numpy()
         
-        loss = crietrion(outputs, lbls)
+        loss = loss_func(outputs, mas)
         loss.backward()
-        optimizer.step()
+        optimizer[0].step()
+        optimizer[1].step()
         metrics.update(true, preds)
 
         running_loss += loss.item() * ims.size(0)
-    scheduler.step()
+    scheduler[0].step()
+    scheduler[1].step()
     epoch_loss = running_loss / len(loader)
     score = metrics.get_results()
 
     return epoch_loss, score
 
-def val_epoch(devices, model, loader, metrics, args):
+def val_epoch(devices, model, backbone, loader, metrics, args):
 
     model.eval()
     metrics.reset()
     running_loss = 0.0
 
-    crietrion = criterion.get_criterion.__dict__[args.loss_type]()
+    loss_func = criterion.get_criterion.__dict__[args.loss_type]()
 
     with torch.no_grad():
         for i, (ims, lbls) in enumerate(loader):
 
             ims = ims.to(devices)
-            lbls = lbls.to(devices)
+            mas = lbls[0].to(devices)
 
             outputs = model(ims)
             probs = nn.Softmax(dim=1)(outputs)
             preds = torch.max(probs, 1)[1].detach().cpu().numpy()
-            true = lbls.detach().cpu().numpy()
+            true = mas.detach().cpu().numpy()
             
-            loss = crietrion(outputs, lbls)
+            loss = loss_func(outputs, mas)
             metrics.update(true, preds)
 
             running_loss += loss.item() * ims.size(0)
@@ -139,32 +159,23 @@ def val_epoch(devices, model, loader, metrics, args):
     return epoch_loss, score
 
 def run_training(args, RUN_ID, DATA_FOLD) -> dict:
-    start_time = datetime.now()
-    results = {
-        "Short Memo" : args.short_memo + " Kfold-" + str(args.kfold),
-        "F1 score" : {
-            "background" : 0.00,
-            "RoI" : 0.00
-        },
-        "Bbox regression" : {
-            "MSE" : 0.00,
-        },
-        "time elapsed" : "h:m:s.ms"
-    }
-
-    devices = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     torch.manual_seed(args.random_seed)
     np.random.seed(args.random_seed)
     random.seed(args.random_seed)
+
+    start_time = datetime.now()
+    devices = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    writer = SummaryWriter(log_dir=os.path.join(args.TB_pth, RUN_ID, DATA_FOLD))
 
     ### Load datasets
     loader = utils.get_loader(args, )
 
     ### Load model
     model = models.models.__dict__[args.model]()
+    backbone = models.models.__dict__['backbone_resnet50']()
 
     ### Set up optimizer and scheduler
-    optimizer, scheduler = set_optim(args, model)
+    optimizer, scheduler = set_optim(args, model, backbone)
 
     ### Resume models, schedulers and optimizer
     if args.resume:
@@ -176,7 +187,9 @@ def run_training(args, RUN_ID, DATA_FOLD) -> dict:
     if torch.cuda.device_count() > 1:
         print('cuda multiple GPUs')
         model = nn.DataParallel(model)
+        backbone = nn.DataParallel(backbone)
     model.to(devices)
+    backbone.to(devices)
 
     ### Set up metrics
     metrics = utils.StreamSegMetrics(n_classes=2)
@@ -185,12 +198,15 @@ def run_training(args, RUN_ID, DATA_FOLD) -> dict:
 
     ### Train
     for epoch in range(resume_epoch, args.total_itrs):
-        epoch_loss, score = train_epoch(devices, model, loader[0], optimizer, scheduler, metrics, args)
+        epoch_loss, score = train_epoch(devices, model, backbone, loader[0], optimizer, scheduler, metrics, args)
         print_result('train', score, epoch, args.total_itrs, epoch_loss)
-        epoch_loss, score = val_epoch(devices, model, loader[1], metrics, args)
+        add_writer_scalar(writer, 'train', score, epoch_loss, epoch)
+        
+        epoch_loss, score = val_epoch(devices, model, backbone, loader[1], metrics, args)
         print_result('val', score, epoch, args.total_itrs, epoch_loss)
+        add_writer_scalar(writer, 'val', score, epoch_loss, epoch)
 
-        if early_stop(score['Class F1'][1], model, optimizer, scheduler, epoch):
+        if early_stop(score['Class F1'][1], model, optimizer[0], scheduler[0], epoch):
             best_score = score
             best_loss = epoch_loss
 
@@ -202,8 +218,15 @@ def run_training(args, RUN_ID, DATA_FOLD) -> dict:
             print("Run Demo !!!")
             break
     
-    results['F1 score']['background'] = best_score['Class F1'][0]
-    results['F1 score']['RoI'] = best_score['Class F1'][1]
-    results['time elapsed'] = str(datetime.now() - start_time)
+    results = {
+        "F1 score" : {
+            "background" : best_score['Class F1'][0],
+            "RoI" : best_score['Class F1'][1]
+        },
+        "Bbox regression" : {
+            "MSE" : 0.00,
+        },
+        "time elapsed" : str(datetime.now() - start_time)
+    }
 
     return results

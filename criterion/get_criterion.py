@@ -1,10 +1,12 @@
+from torch.nn import MSELoss
+
 from .dice import DiceLoss
 from .entropydice import EntropyDiceLoss
 from .crossentropy import CrossEntropyLoss
 
 def entropydice(**kwargs):
 
-    return EntropyDiceLoss()
+    return EntropyDiceLoss(update_weight=False)
 
 def dice(**kwargs):
 
@@ -14,6 +16,9 @@ def crossentropy(**kwargs):
 
     return CrossEntropyLoss()
 
+def mseloss(**kwargs):
+
+    return MSELoss()
 
 if __name__ == "__main__":
 

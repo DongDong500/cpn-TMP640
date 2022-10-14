@@ -1,5 +1,25 @@
+from typing import Type, Any, Callable, Union, List, Optional
+
+import torch.nn as nn
+from torch import Tensor
+
 import segmentation_models_pytorch as SMP
 from vit_pytorch import ViT
+from torchvision.models import resnet50, resnet101, ResNet50_Weights, ResNet101_Weights
+from torchvision.models import ResNet
+from torchvision.models.resnet import Bottleneck
+
+class _Backbone_resnet50(ResNet):
+
+    def __init__(self, weights: Optional[ResNet50_Weights] = ResNet50_Weights.IMAGENET1K_V2):
+        super(_Backbone_resnet50, self).__init__(block=Bottleneck, layers=[3, 4, 6, 3])
+        weights = ResNet50_Weights.verify(weights)
+        super().load_state_dict(weights.get_state_dict(progress=True))
+        self.additional_layer = nn.Linear(1000, 2)
+
+    def forward(self, x: Tensor) -> Tensor:
+        x = super().forward(x)
+        return self.additional_layer(x)
 
 
 def deeplabv3plus_resnet50(encoder_name='resnet50', encoder_depth=5, encoder_weights='imagenet', encoder_output_stride=16, 
@@ -56,3 +76,9 @@ def unet(**kwargs, ):
     """
     from .unet import Unet
     return Unet(n_channels=3, n_classes=2, )
+
+def backbone_resnet50(**kwargs, ):
+
+    x = 1
+    
+    return _Backbone_resnet50()

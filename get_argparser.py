@@ -5,7 +5,7 @@ import models
 def get_argparser():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--short_memo", type=str, default='short memo', 
+    parser.add_argument("--short_memo", type=str, default='short memo ...', 
                         help="")
     parser.add_argument("--login", type=str, default='/home/dongik/src/login.json', 
                         help="SMTP login ID&PW")
@@ -52,7 +52,7 @@ def get_argparser():
                         help='Final upsampling factor. Default is 4 to preserve input-output spatial shape identity')
     parser.add_argument("--aux_params", type=dict, default=None,
                         help='Dictionary with parameters of the auxiliary output (classification head)')
-                        
+
     # Dataset options
     parser.add_argument("--num_workers", type=int, default=8, 
                         help="number of workers (default: 8)")

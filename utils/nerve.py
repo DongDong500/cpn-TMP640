@@ -1,4 +1,6 @@
 import os
+import numpy as np
+import torch
 import torch.utils.data as data
 from PIL import Image
 
@@ -13,6 +15,16 @@ class Nerve(data.Dataset):
         transform (callable, optional): A function/transform that  takes in an PIL image
                                         and returns a transformed version. E.g, ``transforms.RandomCrop``
     """
+    def get_anchor(self, target):
+        size = target.size #(width, height)
+        mask = np.array(target, dtype=np.uint8)
+        h, w = np.where(mask > 0)
+        tl = (h.min(), w.min())
+        rb = (h.max(), w.max())
+        pnt = np.array([ (tl[0] + rb[0]) / 1280 , (tl[1] + rb[1]) / 1280 ], dtype=np.float32)
+
+        return pnt
+
     def _read(self, index):
         """
         Args:
@@ -29,6 +41,8 @@ class Nerve(data.Dataset):
         target = Image.open(self.masks[index]).convert('L')                  
 
         assert( img.size == target.size == (640, 640) )
+
+        target = (target, self.get_anchor(target))
 
         return img, target
 
@@ -77,12 +91,13 @@ class Nerve(data.Dataset):
             tuple: (image, target) where target is the image segmentation.
         """
         img = self.image[index]
-        target = self.mask[index]
+        target = self.mask[index][0]
+        anchor = self.mask[index][1]
         
         if self.transform is not None:
             img, target = self.transform(img, target)
         
-        return img, target
+        return img, (target, torch.from_numpy(anchor))
 
     def __len__(self):
         return len(self.images)
@@ -108,6 +123,9 @@ if __name__ == "__main__":
         print(f'len [{ist}]: {len(dst)}')
 
         for i, (ims, lbls) in tqdm(enumerate(loader)):
+            if i == 0:
+                print(lbls[1].size())
+                print(lbls[0].size())
             pass
         print('Clear !!!')
     

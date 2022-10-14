@@ -15,7 +15,7 @@ def mkLogDir(args, verbose=False):
     hostname = socket.gethostname()
     pth_prefix = os.path.dirname( os.path.dirname( os.path.abspath(__file__) ) )
     folder_name = os.path.dirname( os.path.abspath(__file__) ).split('/')[-1] + '-result'
-    current_time = datetime.now().strftime('%b%d_%H-%M-%S') + ('_demo' if args.run_demo else '')
+    current_time = datetime.now().strftime('%b%d-%H-%M-%S') + ('_demo' if args.run_demo else '')
 
     if verbose:
         print(f'hostname: {hostname}\nfolder: {folder_name}\ncurrent time: {current_time}\nprefix: {pth_prefix}')
@@ -41,37 +41,37 @@ def main_worker(args, ) -> dict:
         
         start_time = datetime.now()
         results[RUN_ID] = {}
-        msg_body = {
-            "Short Memo" : str(args.kfold) + "-fold average summary",
-            "F1 score" : {
-                "background" : 0,
-                "RoI" : 0
-            },
-            "Bbox regression" : {
-                "MSE" : 0,
-            },
-            "time elapsed" : ""
-        }
-        f1bg = 0.0
-        f1roi = 0.0
-        bbox = 0.0
+        
+        f1bg, f1roi, bbox = 0.0, 0.0, 0.0
         for i in range(0, args.kfold):
             args.k = i
             DATA_FOLD = 'fold_' + str(i).zfill(2)
             print(f"{i + 1}-th data fold")
             os.makedirs(os.path.join( args.TB_pth, RUN_ID, DATA_FOLD ))
             os.makedirs(os.path.join( args.BP_pth, RUN_ID, DATA_FOLD ))
+            
             results[RUN_ID][DATA_FOLD] = run_training(args, RUN_ID, DATA_FOLD)
+            
             f1bg += results[RUN_ID][DATA_FOLD]['F1 score']['background']
             f1roi += results[RUN_ID][DATA_FOLD]['F1 score']['RoI']
             bbox += results[RUN_ID][DATA_FOLD]['Bbox regression']['MSE']
 
-        msg_body['F1 score']['background'] = f1bg / args.kfold
-        msg_body['F1 score']['RoI'] = f1roi / args.kfold
-        msg_body['Bbox regression']['MSE'] = bbox / args.kfold
-        msg_body['time elapsed'] = str(datetime.now() - start_time)
-
-        utils.Email(msg=msg_body, ).send()
+        subject = f"[{args.model}]" + args.current_time
+        msg_body = {
+            "Description" : f"kfold (k={args.kfold}) average summary",
+            "Short Memo" : args.short_memo,
+            "Model" : "Model :" + args.model,
+            "Dir" : "Dir: " + args.current_time,
+            "F1 score" : {
+                "background" : f"{f1bg / args.kfold:.5f}",
+                "RoI" : f"{f1roi / args.kfold:.5f}"
+            },
+            "Bbox regression" : {
+                "MSE" : f"{bbox / args.kfold:.5f}",
+            },
+            "time elapsed" : str(datetime.now() - start_time)
+        }
+        utils.Email(subject=subject, msg=msg_body, ).send()
 
     return results
 
