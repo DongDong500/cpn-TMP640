@@ -1,6 +1,6 @@
 import os
 import random
-
+import numbers
 import numpy as np
 
 import torch
@@ -96,9 +96,70 @@ def set_optim(args, model, backbone):
 
     return optimizer, scheduler
 
+def get_pnt(pnt, crop_size):
+    # Height
+    if pnt[0] >= crop_size[0]/2 and (640 - pnt[0]) >= crop_size[0]/2:
+        lt = (int(pnt[0] - crop_size[0]/2), 0)
+        rb = (int(pnt[0] + crop_size[0]/2), 0)
+    elif pnt[0] < crop_size[0]/2 and (640 - pnt[0]) >= crop_size[0]/2:
+        lt = (0, 0)
+        rb = (crop_size[0], 0)
+    elif pnt[0] >= crop_size[0]/2 and (640 - pnt[0]) < crop_size[0]/2:
+        lt = (640 - crop_size[0], 0)
+        rb = (640, 0)
+    lt = list(lt)
+    rb = list(rb)
+    # Width
+    if pnt[1] >= crop_size[1]/2 and (640 - pnt[1]) >= crop_size[1]/2:
+        lt[1] = int(pnt[1] - crop_size[1]/2)
+        rb[1] = int(pnt[1] + crop_size[1]/2)
+    elif pnt[1] < crop_size[1]/2 and (640 - pnt[1]) >= crop_size[1]/2:
+        lt[1] = 0
+        rb[1] = crop_size[1]
+    elif pnt[1] >= crop_size[1]/2 and (640 - pnt[1]) < crop_size[1]/2:
+        lt[1] = 640 - crop_size[1]
+        rb[1] = 640
+
+    return lt, rb
+
+def crop(ims, mas, anchor, devices, crop_size=256):
+    if isinstance(crop_size, numbers.Number):
+        crop_size = (int(crop_size), int(crop_size))
+    else:
+        crop_size = crop_size
+    
+    cims = torch.zeros((ims.shape[0], 3, crop_size[0], crop_size[1]), 
+                        device=devices, dtype=ims.dtype, )
+    cmas = torch.zeros((mas.shape[0], crop_size[0], crop_size[1]), 
+                        device=devices, dtype=torch.long,)
+    anchor = ((anchor * 640) + 320).type(torch.int32)
+    
+    for i in range(ims.size()[0]):
+        lt, rb = get_pnt(anchor[i], crop_size)
+        cims[i, ...] = ims[i, ...][... , lt[0]:rb[0], lt[1]:rb[1]]
+        cmas[i, ...] = mas[i, ...][lt[0]:rb[0], lt[1]:rb[1]]
+        
+    return cims, cmas
+
+def recover(mas, cmas, anchor, devices, crop_size=256):
+    if isinstance(crop_size, numbers.Number):
+        crop_size = (int(crop_size), int(crop_size))
+    else:
+        crop_size = crop_size
+
+    result = torch.zeros(mas.shape, device=devices, dtype=torch.long, )
+    anchor = ((anchor * 640) + 320).type(torch.int32)
+
+    for i in range(mas.size()[0]):
+        lt, rb = get_pnt(anchor[i], crop_size)
+        result[i, ...][lt[0]:rb[0], lt[1]:rb[1]] = cmas[i, ...]
+    
+    return result
+
 def train_epoch(devices, model, backbone, loader, optimizer, scheduler, metrics, args):
 
     model.train()
+    backbone.train()
     metrics.reset()
     running_loss = [0.0, 0.0]
 
@@ -113,26 +174,28 @@ def train_epoch(devices, model, backbone, loader, optimizer, scheduler, metrics,
         mas = lbls[0].to(devices)
         bbox = lbls[1].to(devices)
 
-        outputs = backbone(ims)
-        mse_loss = mse(outputs, bbox)
+        anchor = backbone(ims)
+        mse_loss = mse(anchor, bbox)
         mse_loss.backward()
 
-        outputs = model(ims)
+        cims, cmas = crop(ims, mas, anchor, devices, crop_size=256)
+
+        outputs = model(cims)
         probs = nn.Softmax(dim=1)(outputs)
-        preds = torch.max(probs, 1)[1].detach().cpu().numpy()
+        preds = recover(mas, torch.max(probs, 1)[1], anchor, devices, crop_size=256)
         true = mas.detach().cpu().numpy()
 
-        loss = loss_func(outputs, mas)
+        loss = loss_func(outputs, cmas)
         loss.backward()
         optimizer[0].step()
         optimizer[1].step()
-        metrics.update(true, preds)
+        metrics.update(true, preds.detach().cpu().numpy())
 
         running_loss[0] += loss.item() * ims.size(0)
         running_loss[1] += mse_loss.item() * ims.size(0)
     scheduler[0].step()
     scheduler[1].step()
-    epoch_loss = [running_loss[0] / len(loader), running_loss[1] / len(loader)]
+    epoch_loss = [running_loss[0] / len(loader.dataset), running_loss[1] / len(loader.dataset)]
     score = metrics.get_results()
 
     return epoch_loss, score
@@ -140,6 +203,7 @@ def train_epoch(devices, model, backbone, loader, optimizer, scheduler, metrics,
 def val_epoch(devices, model, backbone, loader, metrics, args):
 
     model.eval()
+    backbone.eval()
     metrics.reset()
     running_loss = [0.0, 0.0]
 
@@ -153,20 +217,22 @@ def val_epoch(devices, model, backbone, loader, metrics, args):
             mas = lbls[0].to(devices)
             bbox = lbls[1].to(devices)
 
-            outputs = backbone(ims)
-            mse_loss = mse(outputs, bbox)
+            anchor = backbone(ims)
+            mse_loss = mse(anchor, bbox)
 
-            outputs = model(ims)
+            cims, cmas = crop(ims, mas, anchor, devices, crop_size=256)
+
+            outputs = model(cims)
             probs = nn.Softmax(dim=1)(outputs)
-            preds = torch.max(probs, 1)[1].detach().cpu().numpy()
+            preds = recover(mas, torch.max(probs, 1)[1], anchor, devices, crop_size=256)
             true = mas.detach().cpu().numpy()
             
-            loss = loss_func(outputs, mas)
-            metrics.update(true, preds)
+            loss = loss_func(outputs, cmas)
+            metrics.update(true, preds.detach().cpu().numpy())
 
             running_loss[0] += loss.item() * ims.size(0)
             running_loss[1] += mse_loss.item() * ims.size(0)
-        epoch_loss = [running_loss[0] / len(loader), running_loss[1] / len(loader)]
+        epoch_loss = [running_loss[0] / len(loader.dataset), running_loss[1] / len(loader.dataset)]
         score = metrics.get_results()
 
     return epoch_loss, score
@@ -209,7 +275,7 @@ def run_training(args, RUN_ID, DATA_FOLD) -> dict:
     early_stop = utils.EarlyStopping(patience=args.patience, delta=args.delta, verbose=True, 
                     path=os.path.join(args.BP_pth, RUN_ID, DATA_FOLD), ceiling=True, )
     backbone_stop = utils.EarlyStopping(patience=args.patience, delta=args.delta, verbose=True, 
-                        path=os.path.join(args.BP_pth, RUN_ID, DATA_FOLD), ceiling=False)
+                        path=os.path.join(args.BP_pth, RUN_ID, DATA_FOLD), ceiling=False, ckpt='backbone.pt')
     ### Train
     for epoch in range(resume_epoch, args.total_itrs):
         epoch_loss, score = train_epoch(devices, model, backbone, loader[0], optimizer, scheduler, metrics, args)
@@ -227,6 +293,7 @@ def run_training(args, RUN_ID, DATA_FOLD) -> dict:
         if early_stop(score['Class F1'][1], model, optimizer[0], scheduler[0], epoch):
             best_score = score
             best_loss = epoch_loss
+
         if backbone_stop(epoch_loss[1], backbone, optimizer[1], scheduler[1], epoch):
             pass
 
@@ -244,7 +311,7 @@ def run_training(args, RUN_ID, DATA_FOLD) -> dict:
             "RoI" : best_score['Class F1'][1]
         },
         "Bbox regression" : {
-            "MSE" : 0.00,
+            "MSE" : best_loss[1],
         },
         "time elapsed" : str(datetime.now() - start_time)
     }

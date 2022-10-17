@@ -7,7 +7,7 @@ import os
 class EarlyStopping:
     """ Stop training if validation loss or any score (Dice, Acc ...) does not improve after given patience """
     def __init__(self, patience:int = 100, delta:int = 0, verbose:bool = False,
-                    path:str = 'checkpoint.pt', ceiling:bool = False):
+                    path:str = 'checkpoint.pt', ceiling:bool = False, ckpt:str = 'checkpoint.pt'):
         """
         Args:
             patience (int): waits until given patience epochs after improved validation loss or scores. 
@@ -29,6 +29,8 @@ class EarlyStopping:
         self.counter = 0
         self.best_score = -np.Inf if self.ceiling else np.Inf
         self.early_stop = False
+        self.ckpt = ckpt
+
 
     def __call__(self, score, model, optimizer, scheduler, cur_epoch):
 
@@ -64,14 +66,9 @@ class EarlyStopping:
             msg = 'Score increased' if self.ceiling else 'Validation loss decreased'
             print(f'{msg} ({self.best_score:.4f} --> {score:.4f})')
         
-        if not os.path.exists(os.path.join(self.path, 'checkpoint.pt')):
-            ckpt = 'backbone.pt'
-        else:
-            ckpt = 'checkpoint.pt'
-        
         torch.save({
             'model_state' : model.state_dict(),
             'optimizer_state' : optimizer.state_dict(),
             'scheduler_state' : scheduler.state_dict(),
             'cur_epoch' : cur_epoch,
-        }, os.path.join(self.path, ckpt))
+        }, os.path.join(self.path, self.ckpt))
