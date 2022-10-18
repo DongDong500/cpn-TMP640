@@ -178,11 +178,11 @@ def train_epoch(devices, model, backbone, loader, optimizer, scheduler, metrics,
         mse_loss = mse(anchor, bbox)
         mse_loss.backward()
 
-        cims, cmas = crop(ims, mas, anchor, devices, crop_size=256)
+        cims, cmas = crop(ims, mas, bbox, devices, crop_size=256)
 
         outputs = model(cims)
         probs = nn.Softmax(dim=1)(outputs)
-        preds = recover(mas, torch.max(probs, 1)[1], anchor, devices, crop_size=256)
+        preds = recover(mas, torch.max(probs, 1)[1], bbox, devices, crop_size=256)
         true = mas.detach().cpu().numpy()
 
         loss = loss_func(outputs, cmas)
@@ -220,11 +220,11 @@ def val_epoch(devices, model, backbone, loader, metrics, args):
             anchor = backbone(ims)
             mse_loss = mse(anchor, bbox)
 
-            cims, cmas = crop(ims, mas, anchor, devices, crop_size=256)
+            cims, cmas = crop(ims, mas, bbox, devices, crop_size=256)
 
             outputs = model(cims)
             probs = nn.Softmax(dim=1)(outputs)
-            preds = recover(mas, torch.max(probs, 1)[1], anchor, devices, crop_size=256)
+            preds = recover(mas, torch.max(probs, 1)[1], bbox, devices, crop_size=256)
             true = mas.detach().cpu().numpy()
             
             loss = loss_func(outputs, cmas)
@@ -250,8 +250,8 @@ def run_training(args, RUN_ID, DATA_FOLD) -> dict:
     loader = utils.get_loader(args, )
 
     ### Load model
-    model = models.models.__dict__[args.model]()
-    backbone = models.models.__dict__['backbone_resnet50']()
+    model = models.models.__dict__[args.model](args, )
+    backbone = models.models.__dict__[args.backbone](args, )
 
     ### Set up optimizer and scheduler
     optimizer, scheduler = set_optim(args, model, backbone)
@@ -291,11 +291,9 @@ def run_training(args, RUN_ID, DATA_FOLD) -> dict:
         writer.add_scalar('MSE epoch loss/val', epoch_loss[1], epoch)
 
         if early_stop(score['Class F1'][1], model, optimizer[0], scheduler[0], epoch):
+            backbone_stop.save_checkpoint(epoch_loss[1], backbone, optimizer[1], scheduler[1], epoch)
             best_score = score
             best_loss = epoch_loss
-
-        if backbone_stop(epoch_loss[1], backbone, optimizer[1], scheduler[1], epoch):
-            pass
 
         if early_stop.early_stop:
             print("Early Stop !!!")

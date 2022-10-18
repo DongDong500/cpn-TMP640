@@ -29,6 +29,9 @@ def get_argparser():
                               models.models.__dict__[name]) )
     parser.add_argument("--model", type=str, default='deeplabv3plus_resnet50', choices=available_models,
                         help='model name (default: deeplabv3plus_resnet50)')
+    parser.add_argument("--backbone", type=str, default='backbone_resnet50', choices=available_models,
+                        help='model name (default: backbone_resnet50)')
+
     # DeeplabV3+ options
     parser.add_argument("--encoder_name", type=str, default='resnet50',
                         help='Name of the classification model that will be used as an encoder (a.k.a backbone)')
@@ -52,6 +55,27 @@ def get_argparser():
                         help='Final upsampling factor. Default is 4 to preserve input-output spatial shape identity')
     parser.add_argument("--aux_params", type=dict, default=None,
                         help='Dictionary with parameters of the auxiliary output (classification head)')
+    # Backbone ViT options
+    parser.add_argument("--vit_image_size", type=int, default=640,
+                        help='ViT image size')
+    parser.add_argument("--vit_patch_size", type=int, default=64,
+                        help='ViT patch size')
+    parser.add_argument("--vit_num_classes", type=int, default=1000,
+                        help='ViT num classes')
+    parser.add_argument("--vit_dim", type=int, default=1024,
+                        help='ViT dim')
+    parser.add_argument("--vit_depth", type=int, default=6,
+                        help='ViT depth')
+    parser.add_argument("--vit_heads", type=int, default=16,
+                        help='ViT heads')
+    parser.add_argument("--vit_mlp_dim", type=int, default=2048,
+                        help='ViT mlp dim')
+    parser.add_argument("--vit_pool", type=str, default='cls', choices=['cls', 'mean'])
+    parser.add_argument("--vit_dim_head", type=int, default=64)
+    parser.add_argument("--vit_dropout", type=float, default=0.1,
+                        help='ViT dropout')
+    parser.add_argument("--vit_emb_dropout", type=float, default=0.1,
+                        help='ViT emb dropout')  
 
     # Dataset options
     parser.add_argument("--num_workers", type=int, default=8, 
