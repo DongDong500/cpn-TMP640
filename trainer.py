@@ -40,12 +40,12 @@ def set_optim(args, model, backbone):
             ], lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay )
         elif args.optim == "RMSprop":
             optimizer[0] = torch.optim.RMSprop(params=[
-            {'params': model.backbone.parameters(), 'lr': 0.1 * args.lr},
+            {'params': model.encoder.parameters(), 'lr': 0.1 * args.lr},
             {'params': model.classifier.parameters(), 'lr': args.lr},
             ], lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay )
         elif args.optim == "Adam":
             optimizer[0] = torch.optim.Adam(params=[
-            {'params': model.backbone.parameters(), 'lr': 0.1 * args.lr},
+            {'params': model.encoder.parameters(), 'lr': 0.1 * args.lr},
             {'params': model.classifier.parameters(), 'lr': args.lr},
             ], lr=args.lr, betas=(0.9, 0.999), eps=1e-8 )
         else:
@@ -64,7 +64,7 @@ def set_optim(args, model, backbone):
             raise NotImplementedError
     ### Optimizer (Backbone)
     optimizer[1] = torch.optim.SGD(
-                    backbone.parameters(), lr=args.lr, weight_decay=args.weight_decay, momentum=args.momentum )
+                    backbone.parameters(), lr=args.backbone_lr, weight_decay=args.weight_decay, momentum=args.momentum )
 
     ### Scheduler (Segmentation)
     if args.lr_policy == 'lambdaLR':

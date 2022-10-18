@@ -43,19 +43,18 @@ def main_worker(args, ) -> dict:
         results[RUN_ID] = {}
         
         f1bg, f1roi, bbox = 0.0, 0.0, 0.0
-        #for i in range(0, args.kfold):
-        i = 2
-        args.k = i
-        DATA_FOLD = 'fold_' + str(i).zfill(2)
-        print(f"{i + 1}-th data fold")
-        os.makedirs(os.path.join( args.TB_pth, RUN_ID, DATA_FOLD ))
-        os.makedirs(os.path.join( args.BP_pth, RUN_ID, DATA_FOLD ))
-        
-        results[RUN_ID][DATA_FOLD] = run_training(args, RUN_ID, DATA_FOLD)
-        
-        f1bg += results[RUN_ID][DATA_FOLD]['F1 score']['background']
-        f1roi += results[RUN_ID][DATA_FOLD]['F1 score']['RoI']
-        bbox += results[RUN_ID][DATA_FOLD]['Bbox regression']['MSE']
+        for i in range(0, args.kfold):
+            args.k = i
+            DATA_FOLD = 'fold_' + str(i).zfill(2)
+            print(f"{i + 1}-th data fold")
+            os.makedirs(os.path.join( args.TB_pth, RUN_ID, DATA_FOLD ))
+            os.makedirs(os.path.join( args.BP_pth, RUN_ID, DATA_FOLD ))
+            
+            results[RUN_ID][DATA_FOLD] = run_training(args, RUN_ID, DATA_FOLD)
+            
+            f1bg += results[RUN_ID][DATA_FOLD]['F1 score']['background']
+            f1roi += results[RUN_ID][DATA_FOLD]['F1 score']['RoI']
+            bbox += results[RUN_ID][DATA_FOLD]['Bbox regression']['MSE']
 
         subject = f"[{args.model}]" + args.current_time
         msg_body = {

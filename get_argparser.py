@@ -99,15 +99,17 @@ def get_argparser():
     parser.add_argument("--total_itrs", type=int, default=1600,
                         help="epoch number (default: 1.6k)")
     parser.add_argument("--loss_type", type=str, default='entropydice',
-                        help="criterion (default: ce+dl)")
+                        help="criterion (default: entropy+dice)")
     parser.add_argument("--optim", type=str, default='SGD',
                         help="optimizer (default: SGD)")
     parser.add_argument("--weight_decay", type=float, default=5e-4,
                         help='weight decay (default: 5e-4)')
     parser.add_argument("--momentum", type=float, default=0.9,
                         help='momentum (default: 0.9)')
-    parser.add_argument("--lr", type=float, default=5e-4,
+    parser.add_argument("--lr", type=float, default=1e-1,
                         help="learning rate (default: 1e-1)")
+    parser.add_argument("--backbone_lr", type=float, default=5e-4,
+                        help="backbone learning rate (default: 5e-4)")
     parser.add_argument("--lr_policy", type=str, default='stepLR',
                         help="scheduler")
     parser.add_argument("--step_size", type=int, default=100, 
