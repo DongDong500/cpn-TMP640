@@ -58,13 +58,13 @@ def get_argparser():
     # Backbone ViT options
     parser.add_argument("--vit_image_size", type=int, default=640,
                         help='ViT image size')
-    parser.add_argument("--vit_patch_size", type=int, default=64,
+    parser.add_argument("--vit_patch_size", type=int, default=32,
                         help='ViT patch size')
     parser.add_argument("--vit_num_classes", type=int, default=1000,
                         help='ViT num classes')
     parser.add_argument("--vit_dim", type=int, default=1024,
                         help='ViT dim')
-    parser.add_argument("--vit_depth", type=int, default=6,
+    parser.add_argument("--vit_depth", type=int, default=8,
                         help='ViT depth')
     parser.add_argument("--vit_heads", type=int, default=16,
                         help='ViT heads')
@@ -106,7 +106,7 @@ def get_argparser():
                         help='weight decay (default: 5e-4)')
     parser.add_argument("--momentum", type=float, default=0.9,
                         help='momentum (default: 0.9)')
-    parser.add_argument("--lr", type=float, default=1e-1,
+    parser.add_argument("--lr", type=float, default=5e-4,
                         help="learning rate (default: 1e-1)")
     parser.add_argument("--lr_policy", type=str, default='stepLR',
                         help="scheduler")
