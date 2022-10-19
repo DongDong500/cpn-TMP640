@@ -9,7 +9,7 @@ if __name__ == "__main__":
 
     net = models.models.__dict__['backbone_resnet101'](args, )
     
-    inputs = torch.rand(5, 3, 640, 640)
-    print(summary(net, (3, 640, 640), device='cpu'))
+    inputs = torch.rand(5, 3, 256, 256)
+    print(summary(net, (3, 256, 256), device='cpu'))
     print(net(inputs).shape)
     #print(net.parameters())

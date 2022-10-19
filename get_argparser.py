@@ -55,6 +55,18 @@ def get_argparser():
                         help='Final upsampling factor. Default is 4 to preserve input-output spatial shape identity')
     parser.add_argument("--aux_params", type=dict, default=None,
                         help='Dictionary with parameters of the auxiliary output (classification head)')
+    # MedT options
+    parser.add_argument("--MedT_zero_init_residual", type=bool, default=True)
+    parser.add_argument("--MedT_groups", type=int, default=8)
+    parser.add_argument("--MedT_width_per_group", type=int, default=64)
+    parser.add_argument("--MedT_replace_stride_with_dilation", default=None)
+    parser.add_argument("--MedT_norm_layer", default=None)
+    parser.add_argument("--MedT_s", type=float, default=0.125)
+    parser.add_argument("--MedT_imgchan", type=int, default=3)
+
+    parser.add_argument("--Ext_size", type=int, default=256,
+                        help='Extrac RoI image size')
+
     # Backbone ViT options
     parser.add_argument("--vit_image_size", type=int, default=640,
                         help='ViT image size')
@@ -75,7 +87,7 @@ def get_argparser():
     parser.add_argument("--vit_dropout", type=float, default=0.1,
                         help='ViT dropout')
     parser.add_argument("--vit_emb_dropout", type=float, default=0.1,
-                        help='ViT emb dropout')  
+                        help='ViT emb dropout') 
 
     # Dataset options
     parser.add_argument("--num_workers", type=int, default=8, 
@@ -88,8 +100,8 @@ def get_argparser():
                         help="kfold (default: 5)")
     parser.add_argument("--k", type=int, default=0, 
                         help="i-th fold set of kfold data (default: 0)")
-    parser.add_argument("--train_batch_size", type=int, default=8, 
-                        help='train batch size (default: 8)')
+    parser.add_argument("--train_batch_size", type=int, default=16, 
+                        help='train batch size (default: 16)')
     parser.add_argument("--val_batch_size", type=int, default=4, 
                         help='validate batch size (default: 4)') 
     parser.add_argument("--test_batch_size", type=int, default=16, 

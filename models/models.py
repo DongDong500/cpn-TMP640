@@ -10,6 +10,7 @@ from torchvision.models import ResNet
 from torchvision.models.resnet import Bottleneck
 
 from .unet import Unet
+from .axialnet import ResAxialAttentionUNet, medt_net, AxialBlock, AxialBlock_dynamic, AxialBlock_wopos
 
 class _Backbone_resnet50(ResNet):
 
@@ -133,6 +134,28 @@ def unet(args, **kwargs, ):
     """U-Net: Convolutional Networks for Biomedical Image Segmentation."""
     
     return Unet(n_channels=3, n_classes=2, )
+
+"""
+Medical Transformer: Gated Axial-Attention for Medical Image Segmentation
+
+"""
+def axialunet(pretrained=False, **kwargs):
+    model = ResAxialAttentionUNet(AxialBlock, [1, 2, 4, 1], s= 0.125, **kwargs)
+    return model
+
+def gated(pretrained=False, **kwargs):
+    model = ResAxialAttentionUNet(AxialBlock_dynamic, [1, 2, 4, 1], s= 0.125, **kwargs)
+    return model
+
+def medt(args, pretrained=False, **kwargs):
+    img_size = args.Ext_size
+    model = medt_net(AxialBlock_dynamic,AxialBlock_wopos, [1, 2, 4, 1], s=0.125, img_size=img_size,  **kwargs)
+    return model
+
+def logo(pretrained=False, **kwargs):
+    model = medt_net(AxialBlock,AxialBlock, [1, 2, 4, 1], s= 0.125, **kwargs)
+    return model
+
 
 def vit(args, **kwargs, ):
 
