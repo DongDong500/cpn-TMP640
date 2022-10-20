@@ -178,11 +178,11 @@ def train_epoch(devices, model, backbone, loader, optimizer, scheduler, metrics,
         mse_loss = mse(anchor, bbox)
         mse_loss.backward()
 
-        cims, cmas = crop(ims, mas, bbox, devices, crop_size=256)
+        cims, cmas = crop(ims, mas, anchor, devices, crop_size=256)
 
         outputs = model(cims)
         probs = nn.Softmax(dim=1)(outputs)
-        preds = recover(mas, torch.max(probs, 1)[1], bbox, devices, crop_size=256)
+        preds = recover(mas, torch.max(probs, 1)[1], anchor, devices, crop_size=256)
         true = mas.detach().cpu().numpy()
 
         loss = loss_func(outputs, cmas)
@@ -220,11 +220,11 @@ def val_epoch(devices, model, backbone, loader, metrics, args):
             anchor = backbone(ims)
             mse_loss = mse(anchor, bbox)
 
-            cims, cmas = crop(ims, mas, bbox, devices, crop_size=256)
+            cims, cmas = crop(ims, mas, anchor, devices, crop_size=256)
 
             outputs = model(cims)
             probs = nn.Softmax(dim=1)(outputs)
-            preds = recover(mas, torch.max(probs, 1)[1], bbox, devices, crop_size=256)
+            preds = recover(mas, torch.max(probs, 1)[1], anchor, devices, crop_size=256)
             true = mas.detach().cpu().numpy()
             
             loss = loss_func(outputs, cmas)

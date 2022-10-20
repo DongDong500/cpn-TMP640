@@ -65,7 +65,7 @@ def get_argparser():
     parser.add_argument("--MedT_imgchan", type=int, default=3)
 
     parser.add_argument("--Ext_size", type=int, default=256,
-                        help='Extrac RoI image size')
+                        help='Extract RoI image size')
 
     # Backbone ViT options
     parser.add_argument("--vit_image_size", type=int, default=640,

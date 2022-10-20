@@ -128,7 +128,7 @@ def deeplabv3plus_resnet101(args, **kwargs):
                             classes=classes, 
                             activation=activation, 
                             upsampling=upsampling, 
-                            aux_params=aux_params)
+                            aux_params=aux_params )
 
 def unet(args, **kwargs, ):
     """U-Net: Convolutional Networks for Biomedical Image Segmentation."""
@@ -194,4 +194,4 @@ def backbone_vit(args, **kwargs):
                         channels = channels, 
                         dim_head = dim_head, 
                         dropout = dropout, 
-                        emb_dropout = emb_dropout)
+                        emb_dropout = emb_dropout )
