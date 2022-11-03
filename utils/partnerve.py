@@ -4,7 +4,7 @@ import torch
 import torch.utils.data as data
 from PIL import Image
 
-class TotalNerve(data.Dataset):
+class PartNerve(data.Dataset):
     """
     Args:
         root_pth (string): Root directory path of the ultrasound peripheral nerve dataset.
@@ -56,42 +56,64 @@ class TotalNerve(data.Dataset):
         self.image_set = image_set
         self.transform = transform
 
+        TRAIN = ['FH', 'FN']
+        VAL = ['FN+1', 'FN+2', 'FN+3', 'FN+4', 'FN+5']
+        RESERVED1 = ['FN-1', 'FN+6', 'FN+7', 'FN+8', 'FN+9', 'FN+10', 'FN+11', 'FN+12', 'FN+13', 'FN+15']
+        RESERVED2 = ['POP', 'POP+1', 'POP+2', 'POP+3', 'POP+5']
+        
+        parts = {}
+        for fname in os.listdir('/home/dongik/datasets/peroneal/UN/Images'):
+            part = fname.split('_')[0]
+            if part not in parts.keys():
+                parts[part] = [fname]
+            else:
+                parts[part] += [fname]
 
+        self.images = []
+        self.masks = []  
         if self.image_set == 'train':
+            for i in TRAIN:    
+                self.images += [os.path.join("/home/dongik/datasets/peroneal/UN/Images", fname) for fname in parts[i]]
+                self.masks += [os.path.join("/home/dongik/datasets/peroneal/UN/Masks", fname) for fname in parts[i]]
             mfH = [
-                [os.path.join("/home/dongik/datasets/median-forearm/HM/Images", fname) \
-                    for fname in os.listdir("/home/dongik/datasets/median-forearm/HM/Images")],
-                [os.path.join("/home/dongik/datasets/median-forearm/HM/Masks", fname) \
-                    for fname in os.listdir("/home/dongik/datasets/median-forearm/HM/Masks")] 
+                [os.path.join("/home/dongik/datasets/median-forearm-d/HM/Images", fname) \
+                    for fname in os.listdir("/home/dongik/datasets/median-forearm-d/HM/Images")],
+                [os.path.join("/home/dongik/datasets/median-forearm-d/HM/Masks", fname) \
+                    for fname in os.listdir("/home/dongik/datasets/median-forearm-d/HM/Masks")] 
                 ]
 
             mfS = [
-                [os.path.join("/home/dongik/datasets/median-forearm/SN/Images", fname) \
-                    for fname in os.listdir("/home/dongik/datasets/median-forearm/SN/Images")],
-                [os.path.join("/home/dongik/datasets/median-forearm/SN/Masks", fname) \
-                    for fname in os.listdir("/home/dongik/datasets/median-forearm/SN/Masks")]
+                [os.path.join("/home/dongik/datasets/median-forearm-d/SN/Images", fname) \
+                    for fname in os.listdir("/home/dongik/datasets/median-forearm-d/SN/Images")],
+                [os.path.join("/home/dongik/datasets/median-forearm-d/SN/Masks", fname) \
+                    for fname in os.listdir("/home/dongik/datasets/median-forearm-d/SN/Masks")]
                 ]
             mwH = [
-                [os.path.join("/home/dongik/datasets/median-wrist/HM/Images", fname) \
-                    for fname in os.listdir("/home/dongik/datasets/median-wrist/HM/Images")],
-                [os.path.join("/home/dongik/datasets/median-wrist/HM/Masks", fname) \
-                    for fname in os.listdir("/home/dongik/datasets/median-wrist/HM/Masks")]
+                [os.path.join("/home/dongik/datasets/median-wrist-d/HM/Images", fname) \
+                    for fname in os.listdir("/home/dongik/datasets/median-wrist-d/HM/Images")],
+                [os.path.join("/home/dongik/datasets/median-wrist-d/HM/Masks", fname) \
+                    for fname in os.listdir("/home/dongik/datasets/median-wrist-d/HM/Masks")]
                 ]
             mwS = [
-                [os.path.join("/home/dongik/datasets/median-wrist/SN/Images", fname) \
-                    for fname in os.listdir("/home/dongik/datasets/median-wrist/SN/Images")],
-                [os.path.join("/home/dongik/datasets/median-wrist/SN/Masks", fname) \
-                    for fname in os.listdir("/home/dongik/datasets/median-wrist/SN/Masks")]
+                [os.path.join("/home/dongik/datasets/median-wrist-d/SN/Images", fname) \
+                    for fname in os.listdir("/home/dongik/datasets/median-wrist-d/SN/Images")],
+                [os.path.join("/home/dongik/datasets/median-wrist-d/SN/Masks", fname) \
+                    for fname in os.listdir("/home/dongik/datasets/median-wrist-d/SN/Masks")]
                 ]
-            self.images = mfH[0] + mfS[0] + mwH[0] + mwS[0]
-            self.masks = mfH[1] + mfS[1] + mwH[1] + mwS[1]
+            #self.images = self.images + mfH[0] + mfS[0] + mwH[0] + mwS[0]
+            #self.masks = self.masks + mfH[1] + mfS[1] + mwH[1] + mwS[1]
         elif self.image_set == 'val':
-            self.images = [os.path.join("/home/dongik/datasets/peroneal/UN/Images", fname) \
-                            for fname in os.listdir("/home/dongik/datasets/peroneal/UN/Images")]
-            self.masks = [os.path.join("/home/dongik/datasets/peroneal/UN/Masks", fname) \
-                            for fname in os.listdir("/home/dongik/datasets/peroneal/UN/Masks")]
+            for i in VAL:    
+                self.images += [os.path.join("/home/dongik/datasets/peroneal/UN/Images", fname) for fname in parts[i]]
+                self.masks += [os.path.join("/home/dongik/datasets/peroneal/UN/Masks", fname) for fname in parts[i]]
         else:
-            raise NotImplementedError    
+            raise NotImplementedError
+        
+        for k, v in parts.items():
+            if self.image_set == 'train' and k in TRAIN:
+                print(f'{k}, N: {len(v)}')
+            elif self.image_set == 'val' and k in VAL:
+                print(f'{k}, N: {len(v)}')
         
         assert (len(self.images) == len(self.masks))
 
@@ -136,13 +158,15 @@ if __name__ == "__main__":
             et.ExtNormalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) ])
     image_set_type = ['train', 'val']
     for ist in image_set_type:
-        dst = TotalNerve(root_pth='/home/dongik/datasets', datatype='peroneal', 
+        dst = PartNerve(root_pth='/home/dongik/datasets', datatype='peroneal', 
                         modality='UN', fold='v5/3', image_set=ist, transform=transform, )
         loader = DataLoader(dst, batch_size=16, shuffle=True, num_workers=2, drop_last=True)
         print(f'len [{ist}]: {len(dst)}')
 
         for i, (ims, lbls) in tqdm(enumerate(loader)):
             if i == 0:
+                sample = [lbls[0], lbls[1]]
+                print()
                 print(lbls[1].size())
                 print(lbls[0].size())
             pass

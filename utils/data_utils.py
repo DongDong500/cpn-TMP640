@@ -5,7 +5,8 @@ from torch.utils.data import DataLoader
 
 from . import ext_transforms as et
 from .nerve import Nerve
-from .TotalNerve import TotalNerve
+from .totalnerve import TotalNerve
+from .partnerve import PartNerve
 
 def get_loader(args, ):
 
@@ -25,7 +26,7 @@ def get_loader(args, ):
         ])
 
     if args.run_test:
-        test_dst = TotalNerve(root_pth=args.data_pth, datatype=args.region, modality=args.modality, 
+        test_dst = PartNerve(root_pth=args.data_pth, datatype=args.region, modality=args.modality, 
                             fold=f'v{args.kfold}/{args.k}', image_set='val', transform=test_transform, )
         test_loader = DataLoader(test_dst, batch_size=args.test_batch_size, 
                                     num_workers=args.num_workers, shuffle=True, drop_last=True)
@@ -33,9 +34,9 @@ def get_loader(args, ):
         print("Dataset - %s\n\tTest\t%d" % 
                 (f'v{args.kfold}/{args.k}' + '/' + args.region, len(test_dst) ))
     else:
-        train_dst = TotalNerve(root_pth=args.data_pth, datatype=args.region, modality=args.modality, 
+        train_dst = PartNerve(root_pth=args.data_pth, datatype=args.region, modality=args.modality, 
                             fold=f'v{args.kfold}/{args.k}', image_set='train', transform=train_transform, )
-        val_dst = TotalNerve(root_pth=args.data_pth, datatype=args.region, modality=args.modality, 
+        val_dst = PartNerve(root_pth=args.data_pth, datatype=args.region, modality=args.modality, 
                             fold=f'v{args.kfold}/{args.k}', image_set='val', transform=val_transform, )
         train_loader = DataLoader(train_dst, batch_size=args.train_batch_size, 
                                     num_workers=args.num_workers, shuffle=True, drop_last=True)
@@ -46,3 +47,6 @@ def get_loader(args, ):
                 (f'v{args.kfold}/{args.k}' + '/' + args.region, len(train_dst), len(val_dst) ))
 
     return loader
+
+if __name__ == "__main__":
+    ...
