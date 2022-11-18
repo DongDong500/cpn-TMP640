@@ -98,27 +98,27 @@ def set_optim(args, model, backbone):
 
 def get_pnt(pnt, crop_size):
     # Height
-    if pnt[0] >= crop_size[0]/2 and (640 - pnt[0]) >= crop_size[0]/2:
+    if pnt[0] >= crop_size[0]/2 and (1024 - pnt[0]) >= crop_size[0]/2:
         lt = (int(pnt[0] - crop_size[0]/2), 0)
         rb = (int(pnt[0] + crop_size[0]/2), 0)
-    elif pnt[0] < crop_size[0]/2 and (640 - pnt[0]) >= crop_size[0]/2:
+    elif pnt[0] < crop_size[0]/2 and (1024 - pnt[0]) >= crop_size[0]/2:
         lt = (0, 0)
         rb = (crop_size[0], 0)
-    elif pnt[0] >= crop_size[0]/2 and (640 - pnt[0]) < crop_size[0]/2:
-        lt = (640 - crop_size[0], 0)
-        rb = (640, 0)
+    elif pnt[0] >= crop_size[0]/2 and (1024 - pnt[0]) < crop_size[0]/2:
+        lt = (1024 - crop_size[0], 0)
+        rb = (1024, 0)
     lt = list(lt)
     rb = list(rb)
     # Width
-    if pnt[1] >= crop_size[1]/2 and (640 - pnt[1]) >= crop_size[1]/2:
+    if pnt[1] >= crop_size[1]/2 and (1024 - pnt[1]) >= crop_size[1]/2:
         lt[1] = int(pnt[1] - crop_size[1]/2)
         rb[1] = int(pnt[1] + crop_size[1]/2)
-    elif pnt[1] < crop_size[1]/2 and (640 - pnt[1]) >= crop_size[1]/2:
+    elif pnt[1] < crop_size[1]/2 and (1024 - pnt[1]) >= crop_size[1]/2:
         lt[1] = 0
         rb[1] = crop_size[1]
-    elif pnt[1] >= crop_size[1]/2 and (640 - pnt[1]) < crop_size[1]/2:
-        lt[1] = 640 - crop_size[1]
-        rb[1] = 640
+    elif pnt[1] >= crop_size[1]/2 and (1024 - pnt[1]) < crop_size[1]/2:
+        lt[1] = 1024 - crop_size[1]
+        rb[1] = 1024
 
     return lt, rb
 
@@ -132,7 +132,7 @@ def crop(ims, mas, anchor, devices, crop_size=256):
                         device=devices, dtype=ims.dtype, )
     cmas = torch.zeros((mas.shape[0], crop_size[0], crop_size[1]), 
                         device=devices, dtype=torch.long,)
-    anchor = ((anchor * 640) + 320).type(torch.int32)
+    anchor = ((anchor * 1024) + 512).type(torch.int32)
     
     for i in range(ims.size()[0]):
         lt, rb = get_pnt(anchor[i], crop_size)
@@ -148,7 +148,7 @@ def recover(mas, cmas, anchor, devices, crop_size=256):
         crop_size = crop_size
 
     result = torch.zeros(mas.shape, device=devices, dtype=torch.long, )
-    anchor = ((anchor * 640) + 320).type(torch.int32)
+    anchor = ((anchor * 1024) + 512).type(torch.int32)
 
     for i in range(mas.size()[0]):
         lt, rb = get_pnt(anchor[i], crop_size)
@@ -177,12 +177,13 @@ def train_epoch(devices, model, backbone, loader, optimizer, scheduler, metrics,
         anchor = backbone(ims)
         mse_loss = mse(anchor, bbox)
         mse_loss.backward()
-
-        cims, cmas = crop(ims, mas, anchor, devices, crop_size=256)
+        
+        # Upper bound
+        cims, cmas = crop(ims, mas, bbox, devices, crop_size=512)
 
         outputs = model(cims)
         probs = nn.Softmax(dim=1)(outputs)
-        preds = recover(mas, torch.max(probs, 1)[1], anchor, devices, crop_size=256)
+        preds = recover(mas, torch.max(probs, 1)[1], bbox, devices, crop_size=512)
         true = mas.detach().cpu().numpy()
 
         loss = loss_func(outputs, cmas)
@@ -220,11 +221,11 @@ def val_epoch(devices, model, backbone, loader, metrics, args):
             anchor = backbone(ims)
             mse_loss = mse(anchor, bbox)
 
-            cims, cmas = crop(ims, mas, anchor, devices, crop_size=256)
+            cims, cmas = crop(ims, mas, bbox, devices, crop_size=512)
 
             outputs = model(cims)
             probs = nn.Softmax(dim=1)(outputs)
-            preds = recover(mas, torch.max(probs, 1)[1], anchor, devices, crop_size=256)
+            preds = recover(mas, torch.max(probs, 1)[1], bbox, devices, crop_size=512)
             true = mas.detach().cpu().numpy()
             
             loss = loss_func(outputs, cmas)

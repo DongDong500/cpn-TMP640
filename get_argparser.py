@@ -87,7 +87,7 @@ def get_argparser():
     parser.add_argument("--vit_dropout", type=float, default=0.1,
                         help='ViT dropout')
     parser.add_argument("--vit_emb_dropout", type=float, default=0.1,
-                        help='ViT emb dropout') 
+                        help='ViT emb dropout')
 
     # Dataset options
     parser.add_argument("--num_workers", type=int, default=8, 
